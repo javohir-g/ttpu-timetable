@@ -113,12 +113,6 @@
   .field input:focus { border-color: var(--accent); }
 
   /* ================= HOME ================= */
-  .hbar { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad-x) 6px; }
-  .hicon { width: 40px; height: 40px; border: none; background: none; color: var(--text2);
-    cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; }
-  .hicon svg { width: 24px; height: 24px; }
-  .hicon .dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--accent); border: 2px solid var(--bg); }
 
   .profile-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px;
     cursor: pointer; margin-bottom: var(--gap); }
@@ -472,10 +466,6 @@
 
 <!-- ================= HOME ================= -->
 <div id="s-home" class="screen">
-  <div class="hbar">
-    <button class="hicon" id="homeMenu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <button class="hicon" id="homeMsg" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-4A8.4 8.4 0 1 1 21 11.5z"/></svg></button>
-  </div>
   <div class="pad">
     <div class="card profile-card" id="homeProfile">
       <div class="pava" id="homeAva"></div>
@@ -842,8 +832,6 @@ function renderHome(){
 $("homeSeeAll").onclick=()=>{haptic();nav("tt");};
 $("homeAtt").onclick=()=>{haptic();nav("att");};
 $("homeProfile").onclick=()=>{haptic();nav("profile");};
-$("homeMenu").onclick=()=>{haptic();nav("profile");};
-$("homeMsg").onclick=()=>toast("No new notifications.");
 
 /* ---------- TIMETABLE ---------- */
 /* неделя Пн–Сб (6 дней), индексы совпадают с данными */
@@ -977,6 +965,72 @@ $("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
   // клик, прилетевший сразу за перетаскиванием, гасим — иначе сработает кнопка под пальцем.
   // Ограничение по времени: залежавшийся флаг не должен съесть обычный тап позже.
   zone.addEventListener("click",e=>{
+    if(dragEndAt && Date.now()-dragEndAt<400){ dragEndAt=0; e.stopPropagation(); e.preventDefault(); }
+  },true);
+})();
+
+/* Свайп между вкладками. На расписании жест уже занят переключением дней,
+   поэтому там страницу не листаем: иначе два жеста дерутся на одном экране.
+   Обработчик висит на окне, но события с расписания отсеиваются по id. */
+(function(){
+  let x0=null, y0=null, axis=null, t0=0, moved=false, dragEndAt=0, box=null;
+  const curId=()=>{ const el=document.querySelector(".screen.active"); return el?el.id.slice(2):null; };
+  const idx=()=>{ const id=curId(); return NAV_ORDER.indexOf(id==="qr"?"scan":id); };
+  const usable=()=>{ const id=curId(); return !!profile && id && id!=="tt" && id!=="login"; };
+  // Горизонтальную прокрутку внутри блока (например, строки карточек на главной)
+  // перехватывать нельзя — иначе её невозможно будет прокрутить.
+  const inScroller=el=>{
+    for(let n=el; n && n!==document.body; n=n.parentElement){
+      if(n.scrollWidth>n.clientWidth+1){
+        const ox=getComputedStyle(n).overflowX;
+        if(ox==="auto"||ox==="scroll") return true;
+      }
+    }
+    return false;
+  };
+  const release=spring=>{
+    if(!box) return;
+    const b=box; box=null;
+    b.style.transition = spring ? "transform .28s cubic-bezier(.3,1.2,.5,1), opacity .2s ease" : "";
+    b.style.transform=""; b.style.opacity="";
+    if(spring) setTimeout(()=>{ b.style.transition=""; },300);
+  };
+  addEventListener("pointerdown",e=>{
+    if(e.pointerType==="mouse" && e.button!==0) return;
+    if(!usable() || inScroller(e.target)) return;
+    x0=e.clientX; y0=e.clientY; axis=null; t0=Date.now(); moved=false;
+    box=$("s-"+curId());
+  });
+  addEventListener("pointermove",e=>{
+    if(x0===null || !box) return;
+    const dx=e.clientX-x0, dy=e.clientY-y0;
+    if(axis===null){                       // ось выбираем один раз, чтобы не мешать прокрутке
+      if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+      axis = Math.abs(dx)>Math.abs(dy) ? "x" : "y";
+    }
+    if(axis!=="x") return;
+    moved=true;
+    const i=idx();
+    const edge = (dx>0 && i<=0) || (dx<0 && i>=NAV_ORDER.length-1);
+    box.style.transition="";
+    box.style.transform=`translateX(${dx*(edge?0.18:0.45)/uiScale}px)`;   // у края списка тянется туже
+    box.style.opacity=String(Math.max(.5, 1-Math.abs(dx)/420));
+  });
+  const end=e=>{
+    if(x0===null) return;
+    const dx=(e.clientX!==undefined?e.clientX:x0)-x0, dt=Date.now()-t0, wasX=(axis==="x");
+    x0=null; axis=null;
+    if(moved) dragEndAt=Date.now();
+    if(!wasX){ if(moved) release(true); return; }
+    const i=idx(), next=i+(dx<0?1:-1);
+    const enough = Math.abs(dx)>70 || (Math.abs(dx)>30 && dt<300);   // длинный либо быстрый смах
+    if(enough && i>=0 && next>=0 && next<NAV_ORDER.length){ release(false); haptic(); nav(NAV_ORDER[next]); }
+    else release(true);
+  };
+  addEventListener("pointerup",end);
+  addEventListener("pointercancel",end);
+  // клик, прилетевший сразу за перетаскиванием, гасим — иначе сработает кнопка под пальцем
+  addEventListener("click",e=>{
     if(dragEndAt && Date.now()-dragEndAt<400){ dragEndAt=0; e.stopPropagation(); e.preventDefault(); }
   },true);
 })();

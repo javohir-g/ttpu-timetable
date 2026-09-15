@@ -617,8 +617,10 @@ function shortSubj(name, max=14){
   if(kept.length && letters.length<2) return cutSubj(kept.map(p=>p.w).join(" "),max);
   return cutSubj(parts.map(p=>p.keep?" "+p.w:p.w[0].toUpperCase()).join("").trim(),max);
 }
-function weekDates(){ const n=new Date(),s=new Date(n),wd=(n.getDay()+6)%7;
-  s.setDate(n.getDate()-wd+(wd===6?7:0)); return [...Array(6)].map((_,i)=>{const d=new Date(s);d.setDate(s.getDate()+i);return d;}); }
+/* off — сдвиг в неделях: 0 текущая, 1 следующая */
+function weekDates(off){ const n=new Date(),s=new Date(n),wd=(n.getDay()+6)%7;
+  s.setDate(n.getDate()-wd+(wd===6?7:0)+(off||0)*7);
+  return [...Array(6)].map((_,i)=>{const d=new Date(s);d.setDate(s.getDate()+i);return d;}); }
 function todayIndex(){ const wd=(new Date().getDay()+6)%7; return wd===6?0:wd; }
 function haptic(){ if(tg&&tg.HapticFeedback) try{tg.HapticFeedback.selectionChanged();}catch(e){} }
 function toast(m){ try{ if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2")) return tg.showAlert(m); }catch(e){} alert(m); }
@@ -698,8 +700,21 @@ function uiStep(d){ const i=UI_STEPS.indexOf(uiScale)+d;
 $("uiDown").onclick=()=>uiStep(-1);
 $("uiUp").onclick=()=>uiStep(1);
 
-function days(){ const pool=profile.kind==="class"?DATA.classes:DATA.teachers;
-  const e=pool.find(x=>x.name===profile.name); return e?e.days:[[],[],[],[],[],[]]; }
+/* w — номер недели: 0 текущая, 1 следующая. По умолчанию текущая, поэтому
+   главная страница и всё остальное продолжают работать как раньше. */
+function days(w){
+  const src = (w===1 && DATA && DATA.next) ? DATA.next : DATA;
+  const pool = profile.kind==="class" ? src.classes : src.teachers;
+  const e=(pool||[]).find(x=>x.name===profile.name);
+  return e?e.days:[[],[],[],[],[],[]];
+}
+/* Следующая неделя показывается, только если она выложена на EduPage: без
+   ключа next в данных переключатель не появляется вовсе. */
+function hasNextWeek(){
+  if(!DATA || !DATA.next || !profile) return false;
+  const pool = profile.kind==="class" ? DATA.next.classes : DATA.next.teachers;
+  return !!(pool && pool.length);
+}
 
 /* ---------- nav ---------- */
 const SCREENS=["home","tt","att","profile"];
@@ -782,15 +797,33 @@ $("homeResMore").onclick=()=>{haptic();nav("att");};
 
 /* ---------- TIMETABLE ---------- */
 /* неделя Пн–Сб (6 дней), индексы совпадают с данными */
-let ttSel = todayIndex(), ttPrev = null;
+let ttSel = todayIndex(), ttPrev = null, ttWk = 0, ttDirHint = 0;
+/* Шаг по дням с переходом через границу недели. Возвращает false, если идти
+   некуда: у края текущей недели без опубликованной следующей. */
+function canStep(dir){
+  const n=ttSel+dir;
+  if(n>=0 && n<=5) return true;
+  return dir>0 ? (ttWk===0 && hasNextWeek()) : (ttWk===1);
+}
+function stepDay(dir){
+  if(!canStep(dir)) return false;
+  ttDirHint=dir;                       // 5→0 при смене недели иначе выглядит как шаг назад
+  const n=ttSel+dir;
+  if(n>=0 && n<=5){ ttSel=n; return true; }
+  if(dir>0){ ttWk=1; ttSel=0; } else { ttWk=0; ttSel=5; }
+  return true;
+}
 function renderTT(){
   // направление перехода: вперёд по неделе — карточки приезжают справа, назад — слева
   const first = ttPrev===null;
-  const dir = first ? 1 : Math.sign(ttSel-ttPrev) || 0;
+  const dir = first ? 1 : (ttDirHint || Math.sign(ttSel-ttPrev) || 0);
+  ttDirHint = 0;
   ttPrev = ttSel;
-  const D=weekDates(), d=D[ttSel], todayStr=new Date().toDateString();
+  const D=weekDates(ttWk), d=D[ttSel], todayStr=new Date().toDateString();
   $("ttDay").textContent=d.getDate();
   $("ttSub").innerHTML=`${DOW[ttSel]}<br>${MONS[d.getMonth()]} ${d.getFullYear()}`;
+  // кнопка и говорит, где ты, и возвращает обратно
+  $("ttToday").textContent = ttWk ? "This week" : "Today";
   // кнопки пересоздаём, а плашку-индикатор оставляем на месте — иначе переезд не анимируется
   const wk=$("ttWeek");
   wk.querySelectorAll(".d").forEach(n=>n.remove());
@@ -803,7 +836,7 @@ function renderTT(){
     wk.appendChild(b);
   });
   movePill(first);
-  const day = days()[ttSel]||[];
+  const day = days(ttWk)[ttSel]||[];
   if(!day.length){ $("ttBody").innerHTML=`<div class="empty"><div class="t">No classes</div>Enjoy your free day</div>`; animateDay(dir); return; }
   let h="";
   day.forEach((e,i)=>{
@@ -854,7 +887,7 @@ function animateScreen(id, dir){
   void box.offsetWidth;
   box.classList.add("anim-in");
 }
-$("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
+$("ttToday").onclick=()=>{ttWk=0;ttSel=todayIndex();ttDirHint=0;haptic();renderTT();};
 
 /* Свайп по расписанию: влево — следующий день, вправо — предыдущий.
    Список тянется за пальцем; на отпускании либо переключает день, либо отпружинивает. */
@@ -880,7 +913,8 @@ $("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
     if(axis!=="x") return;
     moved=true;
     const b=body(); b.classList.remove("day-in");
-    const edge = (dx>0 && ttSel===0) || (dx<0 && ttSel===5);
+    // туже тянется только там, где идти действительно некуда
+    const edge = (dx>0 && !canStep(-1)) || (dx<0 && !canStep(1));
     b.style.transition="";
     // делим на масштаб: внутри zoom'а px растянуты, иначе список обгонял бы палец
     b.style.transform=`translateX(${dx*(edge?0.18:0.45)/uiScale}px)`;   // у края недели тянется туже
@@ -892,9 +926,8 @@ $("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
     x0=null; axis=null;
     if(moved) dragEndAt=Date.now();
     if(!wasX){ if(moved) release(true); return; }
-    const next=ttSel+(dx<0?1:-1);
     const enough = Math.abs(dx)>70 || (Math.abs(dx)>30 && dt<300);   // длинный либо быстрый смах
-    if(enough && next>=0 && next<=5){ release(false); ttSel=next; haptic(); renderTT(); }
+    if(enough && stepDay(dx<0?1:-1)){ release(false); haptic(); renderTT(); }
     else release(true);
   };
   zone.addEventListener("pointerup",end);

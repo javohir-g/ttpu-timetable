@@ -3,6 +3,11 @@
 Генерирует data.json для мини-аппа: расписание всех групп и преподавателей.
 Запускать при обновлении расписания (или по расписанию раз в несколько часов):
     python build_data.py
+
+EduPage хранит расписание версиями, у каждой своя дата начала. Берём ту, что
+действует сегодня, и — если она уже опубликована — следующую. Пока следующей
+версии нет, блок "next" в data.json просто отсутствует, и мини-апп не показывает
+переключатель недель.
 """
 import json
 import re
@@ -30,16 +35,39 @@ def api_post(url, payload):
         return json.load(resp)
 
 
-def fetch_tables():
+def list_timetables():
+    """Все видимые версии расписания, по возрастанию даты начала."""
     url = f"https://{SUBDOMAIN}.edupage.org/timetable/server/ttviewer.js?__func=getTTViewerData"
     data = api_post(url, {"__args": [None, date.today().year], "__gsh": "00000000"})
-    timetables = [t for t in data["r"]["regular"]["timetables"] if not t.get("hidden")]
-    timetables.sort(key=lambda t: t.get("datefrom", ""))
-    tt = timetables[-1]
+    tts = [t for t in data["r"]["regular"]["timetables"] if not t.get("hidden")]
+    tts.sort(key=lambda t: t.get("datefrom", ""))
+    return tts
+
+
+def pick_versions(tts):
+    """Текущая версия — последняя из начавшихся; следующая — первая из будущих."""
+    today = date.today().isoformat()
+    current = None
+    upcoming = None
+    for t in tts:
+        df = t.get("datefrom", "")
+        if not df:
+            continue
+        if df <= today:
+            current = t
+        elif upcoming is None:
+            upcoming = t
+    if current is None and tts:
+        current = tts[-1]          # ни одна ещё не началась — показываем ближайшую
+        if upcoming is current:
+            upcoming = None
+    return current, upcoming
+
+
+def fetch_tables(tt_num):
     url = f"https://{SUBDOMAIN}.edupage.org/timetable/server/regulartt.js?__func=regularttGetData"
-    data = api_post(url, {"__args": [None, tt["tt_num"]], "__gsh": "00000000"})
-    tables = {t["id"]: t["data_rows"] for t in data["r"]["dbiAccessorRes"]["tables"]}
-    return tables, tt.get("text", "")
+    data = api_post(url, {"__args": [None, tt_num], "__gsh": "00000000"})
+    return {t["id"]: t["data_rows"] for t in data["r"]["dbiAccessorRes"]["tables"]}
 
 
 def split_subject(subject):
@@ -49,8 +77,8 @@ def split_subject(subject):
     return subject, ""
 
 
-def main():
-    tables, week_text = fetch_tables()
+def build_week(tables):
+    """Разворачивает одну версию расписания в списки групп и преподавателей."""
     periods = {p["period"]: p for p in tables["periods"]}
     subjects = {s["id"]: s for s in tables["subjects"]}
     teachers = {t["id"]: t for t in tables["teachers"]}
@@ -95,28 +123,55 @@ def main():
             for d in days:
                 by_teacher.setdefault(tid, [[] for _ in range(6)])[d].append(e)
 
-    out = {
-        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "week": week_text,
-        "classes": [],
-        "teachers": [],
-    }
+    out_classes = []
     for cid, days in by_class.items():
         for d in days:
             d.sort(key=lambda e: e["p"])
-        out["classes"].append({"name": class_names.get(cid, "?"), "days": days})
-    out["classes"].sort(key=lambda c: c["name"])
+        out_classes.append({"name": class_names.get(cid, "?"), "days": days})
+    out_classes.sort(key=lambda c: c["name"])
+
+    out_teachers = []
     for tid, days in by_teacher.items():
         for d in days:
             d.sort(key=lambda e: e["p"])
         t = teachers.get(tid, {})
-        out["teachers"].append({"name": t.get("short") or t.get("name", "?"), "days": days})
-    out["teachers"].sort(key=lambda t: t["name"])
+        out_teachers.append({"name": t.get("short") or t.get("name", "?"), "days": days})
+    out_teachers.sort(key=lambda t: t["name"])
+
+    return out_classes, out_teachers
+
+
+def main():
+    tts = list_timetables()
+    current, upcoming = pick_versions(tts)
+    if not current:
+        raise SystemExit("нет ни одной видимой версии расписания")
+
+    classes, teachers = build_week(fetch_tables(current["tt_num"]))
+    out = {
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "week": current.get("text", ""),
+        "from": current.get("datefrom", ""),
+        "classes": classes,
+        "teachers": teachers,
+    }
+
+    # Следующая неделя попадает в файл, только если она уже выложена на EduPage.
+    # Нет версии — нет ключа "next", и переключатель недель в мини-аппе не появится.
+    if upcoming:
+        n_classes, n_teachers = build_week(fetch_tables(upcoming["tt_num"]))
+        out["next"] = {
+            "week": upcoming.get("text", ""),
+            "from": upcoming.get("datefrom", ""),
+            "classes": n_classes,
+            "teachers": n_teachers,
+        }
 
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     size = OUT.stat().st_size
-    print(f"data.json: {len(out['classes'])} groups, {len(out['teachers'])} teachers, "
-          f"{size // 1024} KB, {week_text}")
+    nxt = f", next: {upcoming.get('text', '')}" if upcoming else ", next: не опубликована"
+    print(f"data.json: {len(classes)} groups, {len(teachers)} teachers, "
+          f"{size // 1024} KB, {out['week']}{nxt}")
 
 
 if __name__ == "__main__":

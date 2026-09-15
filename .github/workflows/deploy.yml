@@ -43,6 +43,7 @@ jobs:
           cp miniapp/index.html _site/
           cp miniapp/data.json  _site/
           cp miniapp/sw.js      _site/
+          cp miniapp/icon-*.png _site/
           cp -r miniapp/icons   _site/
 
       - uses: actions/configure-pages@v5

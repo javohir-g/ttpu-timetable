@@ -26,6 +26,8 @@
     --line: #E5E5EA;
     --field: #FFFFFF;
     --field-b: #D9D9DE;
+    /* цветовая индикация оценок */
+    --ok: #34C759; --warn: #FF9500; --bad: #FF3B30;
     /* Эталон — экран расписания: поля страницы 12, зазор между карточками 10,
        карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
     --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
@@ -48,12 +50,14 @@
       --accent: #5DA2F5; --accent-d: #7DB6F8; --tint: #1B2A3D; --tint2: #24425F;
       --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
       --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
+      --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
     }
   }
   :root[data-theme="dark"] {
     --accent: #5DA2F5; --accent-d: #7DB6F8; --tint: #1B2A3D; --tint2: #24425F;
     --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
     --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
+    --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
   }
   /* смена темы не должна выглядеть как перезагрузка страницы */
   body, .card, .nav, .lesson, .mini, .field input, .seg, .lock-badge .ic {
@@ -250,19 +254,6 @@
     transform-origin: left; animation: shrink 60s linear infinite; }
   @keyframes shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-  /* ================= ATTENDANCE ================= */
-  .att-top { display: flex; gap: var(--gap); margin-bottom: var(--gap); }
-  .att-top .num { flex: 1; padding: 18px 16px; font-size: 20px; font-weight: 700; }
-  .att-top .sq { width: 62px; height: 62px; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 2px; color: var(--muted); }
-  .att-top .sq svg { width: 20px; height: 20px; }
-  .att-top .sq b { font-size: 12px; color: var(--text); }
-  .gauge-card { text-align: center; padding: 18px 16px 14px; margin-bottom: var(--gap); }
-  .gauge { position: relative; width: 190px; height: 104px; margin: 0 auto; }
-  .gauge svg { width: 190px; height: 104px; }
-  .gauge .val { position: absolute; left: 0; right: 0; bottom: 0; }
-  .gauge .val .p { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.05; }
-  .gauge .val .c { font-size: 11px; color: var(--text2); margin-top: 3px; }
   .list { padding: 2px 16px; }
   .list .li { display: flex; justify-content: space-between; align-items: center; padding: 11px 0;
     border-bottom: .5px solid var(--line); font-size: 13.5px; }
@@ -392,10 +383,19 @@
   .gr-login h2 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
   .gr-note { font-size: 11.5px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
   .gr-err { font-size: 12px; color: #E5484D; margin-top: 10px; text-align: center; min-height: 15px; }
-  .gr-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: var(--gap); }
-  .gr-who { flex: 1; min-width: 0; }
-  .gr-who .nm { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gr-who .sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  /* Цвет оценки — сразу видно уровень, без чтения цифры.
+     Фон задаём готовой rgba, а не color-mix: он есть не во всех вебвью. */
+  .gr-row .v, .gr-items .it b { font-variant-numeric: tabular-nums; }
+  .gr-row .v { padding: 2px 9px; border-radius: 100px; }
+  .gr-row .v.g-hi  { color: var(--ok);     background: rgba(52,199,89,.14); }
+  .gr-row .v.g-ok  { color: var(--accent); background: var(--tint); }
+  .gr-row .v.g-mid { color: var(--warn);   background: rgba(255,149,0,.16); }
+  .gr-row .v.g-low { color: var(--bad);    background: rgba(255,59,48,.14); }
+  .gr-items .it b.g-hi { color: var(--ok); }
+  .gr-items .it b.g-ok { color: var(--accent); }
+  .gr-items .it b.g-mid { color: var(--warn); }
+  .gr-items .it b.g-low { color: var(--bad); }
+
   .gr-out { width: 34px; height: 34px; border: none; background: none; color: var(--muted);
     cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none; }
   .gr-out svg { width: 18px; height: 18px; }
@@ -588,33 +588,11 @@
       <div class="gr-err" id="grErr"></div>
     </div>
 
-    <!-- оценки: видны, когда токен есть -->
+    <!-- оценки: видны, когда токен есть. Имя не показываем — вход в приложение
+         и так выполняется под конкретным пользователем в самом начале. -->
     <div id="grView" style="display:none">
-      <div class="card gr-head">
-        <div class="gr-who"><div class="nm" id="grName">–</div><div class="sub" id="grWhen"></div></div>
-        <button class="gr-out" id="grOut" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 17 5-5-5-5"/><path d="M20 12H9"/><path d="M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg></button>
-      </div>
       <div class="gr-status" id="grStatus"></div>
       <div class="card list" id="grList"></div>
-    </div>
-
-    <!-- посещаемость: источника данных по-прежнему нет, остаётся заглушкой -->
-    <div class="lock-wrap">
-      <div class="locked">
-      <div class="att-top">
-        <div class="card num" id="attNum">№–</div>
-        <div class="card sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg><b id="attOk">–</b></div>
-        <div class="card sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg><b id="attNo">–</b></div>
-      </div>
-      <div class="card gauge-card">
-        <div class="gauge">
-          <svg viewBox="0 0 190 104"><path d="M14 96 A81 81 0 0 1 176 96" fill="none" stroke="var(--tint2)" stroke-width="14" stroke-linecap="round"/><path id="gaugeArc" d="M14 96 A81 81 0 0 1 176 96" fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/></svg>
-          <div class="val"><div class="p" id="gaugePct">75%</div><div class="c" id="gaugeSub">You were absent 20/80</div></div>
-        </div>
-      </div>
-      <div class="card list" id="attList"></div>
-      </div>
-      <div class="lock-badge" data-title="Coming soon" data-sub="Attendance needs an edupage login"></div>
     </div>
   </div>
 </div>
@@ -647,6 +625,11 @@
         <span class="val" id="uiVal">100%</span>
         <button id="uiUp" aria-label="Larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       </div>
+    </div>
+    <!-- отвязать аккаунт LMS: раньше кнопка жила в шапке оценок -->
+    <div class="card set-card" id="lmsRow" style="display:none">
+      <span class="k">edu.turin.uz</span>
+      <button class="gr-out" id="grOut" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 17 5-5-5-5"/><path d="M20 12H9"/><path d="M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg></button>
     </div>
     <div class="lock-wrap">
       <div class="locked"><div class="card list">
@@ -1117,6 +1100,54 @@ async function lmsCourseItems(courseid,uid){
 const setGrStatus = t => { $("grStatus").textContent = t||""; };
 const setGrErr    = t => { $("grErr").textContent = t||""; };
 
+/* Названия курсов в Moodle приходят как есть: с кодами, подчёркиваниями,
+   хвостом вроде «(SE1-24)» и нередко капсом. Приводим к читаемому виду,
+   но если после чистки ничего не осталось — показываем исходное. */
+const TC_SMALL = new Set(["and","of","the","to","in","for","on","with","a","an","or"]);
+function titleCase(s){
+  return s.toLowerCase().split(/\s+/).map((w,i)=>{
+    if(i>0 && TC_SMALL.has(w)) return w;
+    // Короткое слово, написанное в исходнике капсом, — почти всегда
+    // аббревиатура или номер курса (AI, ML, QA, II). Оставляем как есть,
+    // иначе «AI» превращается в «Ai».
+    if(w.length<=3 && /^[a-z]+$/.test(w) && !TC_SMALL.has(w)) return w.toUpperCase();
+    return w.charAt(0).toUpperCase()+w.slice(1);
+  }).join(" ");
+}
+function prettySubject(name){
+  const src=String(name||"").trim();
+  let t=src.replace(/_+/g," ");
+  // Хвост в скобках убираем, ТОЛЬКО если внутри код группы, год или семестр.
+  // «Mobile Apps (Native and Web)» — часть названия, и терять её нельзя.
+  t=t.replace(/\s*[\[(]([^)\]]*)[\])]\s*$/, (m,inner)=>
+    /^(?:[A-Za-z]{1,4}\d[\w-]*|\d[\w.\-/ ]*|(?:autumn|spring|summer|winter|semester|sem)\b[\w .\-/]*)$/i
+      .test(inner.trim()) ? "" : m);
+  // Числовых кусков в начале бывает несколько («2.1 26 27 …»), поэтому
+  // срезаем всю ведущую череду, а не первый попавшийся.
+  t=t.replace(/^(?:[\d.]+[-–_ ]+)+/,"");
+  t=t.replace(/^[A-Za-z]{2,5}\s*\d{2,4}\s*[-–:]\s*/,"");  // код вида SE101 —
+  t=t.replace(/\s{2,}/g," ").trim();
+  if(t && t===t.toUpperCase() && /[A-Z]{4,}/.test(t)) t=titleCase(t);
+  return t || src;
+}
+/* Оценку берём числом из строки вида «85.00 %» или «85,5». Проценты надёжнее:
+   сырой балл «18/30» дал бы 18 и увёл бы цвет не туда. */
+function gradePct(v){
+  if(v==null) return null;
+  const m=String(v).replace(",",".").match(/-?\d+(\.\d+)?/);
+  if(!m) return null;
+  const n=parseFloat(m[0]);
+  return isFinite(n) ? n : null;
+}
+function gradeClass(v){
+  const n=gradePct(v);
+  if(n==null) return "";
+  if(n>=85) return "g-hi";
+  if(n>=70) return "g-ok";
+  if(n>=55) return "g-mid";
+  return "g-low";
+}
+
 function renderGrades(){
   const on=!!lmsToken;
   $("grLogin").style.display = on ? "none" : "";
@@ -1134,7 +1165,7 @@ async function refreshGrades(quiet){
   if(!quiet) setGrStatus("Loading…");
   try{
     const g=await lmsLoadGrades();
-    lmsSaveGrades(g); paintGrades(g); setGrStatus("");
+    lmsSaveGrades(g); paintGrades(g);   // статус выставит сама paintGrades
   }catch(e){
     if(e.code==="invalidtoken" || e.code==="accessexception"){
       // токен отозван или протух — возвращаем на вход, старые оценки не показываем
@@ -1150,11 +1181,16 @@ async function refreshGrades(quiet){
   } finally { grBusy=false; }
 }
 function paintGrades(g){
-  $("grName").textContent = g.user || "";
-  $("grWhen").textContent = g.updated ? "updated "+new Date(g.updated).toLocaleDateString() : "";
+  // дата обновления переехала в строку статуса — отдельной шапки больше нет
+  setGrStatus(g.updated ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
   const rows=g.courses||[];
   $("grList").innerHTML = rows.length
-    ? rows.map((c,i)=>`<div class="li gr-row" data-i="${i}"><span class="k">${esc(c.name)}</span><span class="v">${esc(c.grade==null?"—":String(c.grade))}</span></div><div class="gr-items" data-items="${i}"></div>`).join("")
+    ? rows.map((c,i)=>{
+        const txt = c.grade==null ? "—" : String(c.grade);
+        return `<div class="li gr-row" data-i="${i}"><span class="k">${esc(prettySubject(c.name))}</span>`
+             + `<span class="v ${gradeClass(c.grade)}">${esc(txt)}</span></div>`
+             + `<div class="gr-items" data-items="${i}"></div>`;
+      }).join("")
     : `<div class="li"><span class="muted">No courses</span></div>`;
   [...$("grList").querySelectorAll(".gr-row")].forEach(r=>{
     r.onclick=()=>toggleCourse(+r.dataset.i);
@@ -1174,7 +1210,8 @@ async function toggleCourse(i){
     const items=await lmsCourseItems(c.id, grades.uid);
     box.dataset.done="1";
     box.innerHTML = items.length
-      ? items.map(it=>`<div class="it"><span>${esc(it.name)}</span><b>${esc(it.grade)}${it.pct?" · "+esc(it.pct):""}</b></div>`).join("")
+      ? items.map(it=>`<div class="it"><span>${esc(prettySubject(it.name))}</span>`
+          + `<b class="${gradeClass(it.pct||it.grade)}">${esc(it.grade)}${it.pct?" · "+esc(it.pct):""}</b></div>`).join("")
       : `<div class="it"><span>No graded items</span></div>`;
   }catch(e){
     box.innerHTML=`<div class="it"><span>${esc(e.message||"Could not load")}</span></div>`;
@@ -1268,17 +1305,9 @@ $("grSignIn").onclick=()=>{ haptic(); showLogin("lms"); };
 $("grOut").onclick=()=>{ lmsSaveToken(""); lmsSaveGrades(null); haptic(); setGrErr(""); setGrStatus(""); renderGrades(); };
 
 /* ---------- ATTENDANCE ---------- */
-function renderAtt(){
-  renderGrades();
-  const s=seedOf(profile.name), pct=68+s%28, total=80, absent=Math.round(total*(1-pct/100));
-  $("attNum").textContent="№"+((DATA.week||"").match(/\d+/)||["–"])[0];
-  $("attOk").textContent=total-absent; $("attNo").textContent=absent;
-  $("gaugePct").textContent=pct+"%"; $("gaugeSub").textContent=`You were absent ${absent}/${total}`;
-  const arc=$("gaugeArc"), len=arc.getTotalLength(); arc.style.strokeDasharray=len; arc.style.strokeDashoffset=len*(1-pct/100);
-  const subs=[...new Set(days().flat().map(e=>clean(e.s)))];
-  $("attList").innerHTML = subs.map((n,i)=>`<div class="li"><span>${esc(n)}</span><span class="v">${(s*(i+2))%5}/16</span></div>`).join("")
-    || `<div class="li"><span class="muted">No subjects</span></div>`;
-}
+/* На экране остались только оценки: выдуманная посещаемость убрана вместе
+   с её разметкой, иначе обращения к удалённым элементам роняли бы экран. */
+function renderAtt(){ renderGrades(); }
 
 /* ---------- PROFILE ---------- */
 function renderProfile(){
@@ -1289,6 +1318,7 @@ function renderProfile(){
     ["Tg user", TGU&&TGU.username ? "@"+TGU.username : "—"],
   ];
   $("profList").innerHTML = rows.map(([k,v])=>`<div class="li"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
+  $("lmsRow").style.display = lmsToken ? "" : "none";   // отвязать можно, только если привязан
   renderThemeSeg();
   $("profUpdated").textContent="Timetable: "+(DATA.week||"")+" · updated "+DATA.updated;
 }

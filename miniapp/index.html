@@ -358,6 +358,28 @@
   .step .val { min-width: 44px; text-align: center; font-size: 12.5px; font-weight: 600;
     color: var(--text2); font-variant-numeric: tabular-nums; }
 
+  /* ================= ОФЛАЙН ================= */
+  /* Плашка висит над нижним меню: так она не перекрывает липкую шапку
+     расписания и не сдвигает вёрстку, когда появляется и исчезает. */
+  .offline { position: fixed; left: 50%; bottom: calc(92px + var(--safe-bot)); z-index: 40;
+    display: flex; align-items: center; gap: 7px;
+    max-width: calc(100% - var(--pad-x) * 4);
+    padding: 8px 14px; border-radius: 100px;
+    background: rgba(var(--card-rgb), .82);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid var(--line);
+    font-size: 12.5px; font-weight: 600; color: var(--text2);
+    pointer-events: none; opacity: 0; transform: translate(-50%, 8px);
+    transition: opacity .28s ease, transform .28s cubic-bezier(.22,.9,.3,1); }
+  .offline.on { opacity: 1; transform: translate(-50%, 0); }
+  .offline .ic { color: var(--muted); flex: none; display: flex; }
+  .offline .ic svg { width: 15px; height: 15px; }
+  .offline .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .offline { background: var(--card); }
+  }
+
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>
 <script>
@@ -533,6 +555,12 @@
     </div>
     <div class="demo-note" id="profUpdated"></div>
   </div>
+</div>
+
+<!-- ================= OFFLINE ================= -->
+<div class="offline" id="offlineBar" aria-live="polite">
+  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3 21 21"/><path d="M9 16.8a4.5 4.5 0 0 1 6 0"/><path d="M5.5 13.3a9 9 0 0 1 3.3-2.1"/><path d="M15.4 11.3a9 9 0 0 1 3.1 2"/><path d="M2 9.6a14 14 0 0 1 4.6-2.9"/><path d="M11.4 5.6A14 14 0 0 1 22 9.6"/><path d="M12 20.2h.01"/></svg></span>
+  <span class="t">Offline — saved timetable<span id="offlineWhen"></span></span>
 </div>
 
 <!-- ================= NAV ================= -->
@@ -974,10 +1002,56 @@ applyUI(uiScale,false);
 // тема и масштаб, выбранные на другом устройстве, приезжают из облака Telegram
 if(hasCloud) try{ tg.CloudStorage.getItem("theme",(e,v)=>{ if(!e&&v&&v!==themeMode) applyTheme(v,false); }); }catch(e){}
 if(hasCloud) try{ tg.CloudStorage.getItem("ui",(e,v)=>{ const n=parseFloat(v); if(!e&&n) applyUI(n,false); }); }catch(e){}
-fetch("data.json?v="+Date.now()).then(r=>r.json()).then(d=>{
+/* ---------- офлайн ---------- */
+/* Расписание дублируем в localStorage: service worker может быть недоступен
+   (старый клиент, запрет на скрипты), а показать последнее известное — обязаны. */
+const DATA_KEY="ttpu_data";
+function saveData(d){ try{ localStorage.setItem(DATA_KEY,JSON.stringify(d)); }catch(e){} }
+function readData(){ try{ const v=localStorage.getItem(DATA_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function setOffline(on){
+  $("offlineBar").classList.toggle("on",on);
+  // подписываем, насколько свежие данные показываем: только дата — со временем
+  // и UTC строка не влезает в плашку на узком экране и обрезается многоточием
+  if(on) $("offlineWhen").textContent = (DATA && DATA.updated) ? " · " + String(DATA.updated).split(" ")[0] : "";
+}
+function start(d,cached){
   DATA=d; $("loading").style.display="none";
+  if(!cached) saveData(d);
+  setOffline(cached || !navigator.onLine);
   loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); });
-}).catch(()=>{ $("loading").textContent="Failed to load data."; });
+}
+// no-store: иначе браузер может отдать вчерашний data.json из собственного кеша
+fetch("data.json",{cache:"no-store"})
+  .then(r=>{ if(!r.ok) throw new Error("http "+r.status);
+    // service worker помечает этим заголовком ответ, отданный из офлайн-кеша
+    const stale = r.headers.get("X-From-Cache")==="1";
+    return r.json().then(d=>({d,stale})); })
+  .then(x=>start(x.d,x.stale))
+  .catch(()=>{
+    const c=readData();
+    if(c) start(c,true);
+    else $("loading").textContent="No connection — and no saved timetable yet.";
+  });
+
+addEventListener("offline",()=>setOffline(true));
+addEventListener("online",()=>{
+  setOffline(false);
+  // сеть вернулась — молча подтягиваем свежее расписание и перерисовываем открытый экран
+  fetch("data.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{
+    if(!d||!profile) return;
+    DATA=d; saveData(d);
+    const act=(document.querySelector(".screen.active")||{}).id;
+    if(act==="s-tt") renderTT();
+    else if(act==="s-home") renderHome();
+    else if(act==="s-att") renderAtt();
+    else if(act==="s-profile") renderProfile();
+  }).catch(()=>{});
+});
+
+/* Офлайн-копия страницы и иконок. Без неё Telegram не сможет открыть мини-апп
+   без сети — одного localStorage тут принципиально недостаточно. */
+if("serviceWorker" in navigator)
+  addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
 </html>

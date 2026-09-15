@@ -462,7 +462,7 @@
   /* Сетка времени: часы по левому краю, дни колонками, пара стоит на своём
      месте и высотой показывает длительность. Так видно «окна» между парами,
      чего стопка карточек не показывала вовсе. */
-  .tg { --hour-h: 58px; --tg-gutter: 54px;
+  .tg { --tg-gutter: 54px;
     background: var(--card); border-radius: var(--r-lg); padding: 14px 14px 18px; }
   .tg-hd { display: grid; grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr));
     align-items: center; padding-bottom: 10px; border-bottom: .5px solid var(--line); }
@@ -470,6 +470,8 @@
   .tg-day b { display: inline-flex; align-items: center; justify-content: center;
     min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
     font-size: 14px; font-weight: 700; color: var(--text); }
+  /* в шапке фоном отмечен только сегодняшний день, остальные дни без плашки */
+  .tg-day.today { background: var(--tint); border-radius: var(--r-sm); }
   .tg-day.today b { background: var(--accent); color: #fff; }
   /* отступ сверху — подпись первого часа центрируется на линии и выступает
      над сеткой; без него она налезает на границу шапки */
@@ -483,13 +485,11 @@
   .tg-hours .sl i { display: block; font-style: normal; font-size: 10.5px;
     color: var(--muted); font-variant-numeric: tabular-nums; }
   /* часовые линии рисуем фоном — так они не плодят элементы */
-  .tg-col { position: relative;
-    background-image: repeating-linear-gradient(to bottom,
-      var(--line) 0, var(--line) .5px, transparent .5px, transparent var(--hour-h)); }
-  /* Вертикальных линеек нет — дни разделяет полоса через один. И шапка, и тело
-     сетки начинаются со служебной ячейки (пустой уголок, колонка времени),
-     поэтому even в обоих списках попадает на одни и те же дни. */
-  .tg-day:nth-child(even), .tg-col:nth-child(even) { background-color: var(--stripe); }
+  /* Линеек нет вовсе — ни вертикальных, ни горизонтальных: дни разделяет полоса
+     через один, а границы пар видны по самим блокам. Полосы только в теле сетки;
+     тело начинается со служебной колонки времени, поэтому even — первый день. */
+  .tg-col { position: relative; }
+  .tg-col:nth-child(even) { background-color: var(--stripe); }
   /* Блок пары: название, тип с аудиторией, преподаватель. Времени нет — оно
      стоит на оси слева. Цвет несёт сама подложка, боковой полоски нет. */
   .tg-ev { position: absolute; overflow: hidden; background: var(--tint);
@@ -1088,7 +1088,7 @@ function renderTTGrid(){
     }
   }
 
-  $("ttGrid").innerHTML = `<div class="tg" style="--hour-h:${HH}px"><div class="tg-hd"><span></span>`
+  $("ttGrid").innerHTML = `<div class="tg"><div class="tg-hd"><span></span>`
     + DOW.map((nm,i)=>`<span class="tg-day${D[i].toDateString()===todayStr?" today":""}">${nm}<b>${D[i].getDate()}</b></span>`).join("")
     + `</div><div class="tg-body" style="height:${H}px">`
     + `<div class="tg-hours">${hours}</div>${cols}${now}</div></div>`;

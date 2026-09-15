@@ -11,7 +11,9 @@
      не меняются, а ждать их по сети незачем.
    Запросы не-GET не трогаем вообще. */
 
-const CACHE = "ttpu-static";
+/* Имя меняется при сбросе данных: обработчик activate удаляет все кеши,
+   кроме текущего, поэтому старая офлайн-копия страницы и расписания уходит. */
+const CACHE = "ttpu-static-v2";
 const SHELL = [
   "./", "index.html", "data.json",
   "icons/home-morph.json", "icons/calendar-morph.json", "icons/qr-code.json",

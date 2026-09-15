@@ -5,8 +5,8 @@
 # токен Telegram-бота
 config.json
 
-# chat_id пользователей и их группы
-users.json
+# chat_id пользователей и их группы, включая резервные копии при сбросе
+users.json*
 
 # Python
 __pycache__/

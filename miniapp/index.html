@@ -435,6 +435,20 @@
 <script>
 /* Тему ставим до первой отрисовки: иначе на тёмной теме кадр мелькнёт светлым. */
 (function(){
+  /* Разовый сброс данных. Срабатывает, когда метка у пользователя не совпадает
+     с текущей, — то есть один раз у каждого. Стоит до чтений ниже: иначе тема
+     и масштаб успеют подхватиться из старых значений. Облачные ключи Telegram
+     чистит основной скрипт — здесь их ещё нет. */
+  var RESET_ID="2026-09-15";
+  try{
+    if(localStorage.getItem("ttpu_reset")!==RESET_ID){
+      ["ttpu_profile","ttpu_theme","ttpu_ui","ttpu_data","ttpu_lms_token","ttpu_grades"]
+        .forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+      localStorage.setItem("ttpu_reset",RESET_ID);
+      window.__ttpuReset=true;   // сигнал основному скрипту: почистить ещё и облако
+    }
+  }catch(e){}
+
   var m="auto"; try{ m=localStorage.getItem("ttpu_theme")||"auto"; }catch(e){}
   var t=m;
   if(m!=="light"&&m!=="dark"){
@@ -1341,7 +1355,15 @@ function start(d,cached){
   DATA=d; $("loading").style.display="none";
   if(!cached) saveData(d);
   setOffline(cached || !navigator.onLine);
-  loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); });
+  // После сброса профиль ещё лежит в облаке Telegram: не вычистить его до
+  // чтения — и он немедленно вернётся обратно, сделав сброс бессмысленным.
+  let went=false;
+  const go=()=>{ if(went) return; went=true;
+    loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); }); };
+  if(window.__ttpuReset && hasCloud){
+    try{ tg.CloudStorage.removeItems(["profile","theme","ui"],()=>go()); }catch(e){ go(); }
+    setTimeout(go,2500);   // облако не ответило — не зависаем на экране загрузки
+  } else go();
 }
 // no-store: иначе браузер может отдать вчерашний data.json из собственного кеша
 fetch("data.json",{cache:"no-store"})

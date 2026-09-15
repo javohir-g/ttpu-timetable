@@ -91,6 +91,11 @@ self.addEventListener("fetch", e => {
   }
 
   const url = new URL(req.url);
+
+  // Ответы LMS не кешируем никогда: это личные данные студента и его токен,
+  // им не место в общем кеше приложения.
+  if (url.hostname === "edu.turin.uz") return;
+
   if (url.origin === self.location.origin && url.pathname.endsWith("data.json")) {
     e.respondWith(networkFirst(req));
     return;

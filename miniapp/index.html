@@ -413,6 +413,16 @@
   .safe-cap { position: fixed; top: 0; left: 0; right: 0; height: var(--safe-top);
     background: var(--bg); z-index: 20; pointer-events: none; }
 
+  /* ================= ОБЩИЙ ВХОД ================= */
+  #lgLms h1 { margin-bottom: 8px; }
+  .lg-note { font-size: 11.5px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
+  .lg-skip { display: block; width: 100%; margin-top: 10px; border: none; background: none;
+    color: var(--accent); font-size: 13px; font-weight: 600; padding: 6px; cursor: pointer; }
+  .lg-who { font-size: 12px; color: var(--muted); text-align: center; margin: -10px 0 14px; }
+  .gr-prompt { padding: 16px; margin-bottom: var(--gap); text-align: center; }
+  .gr-prompt h2 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .gr-prompt p { font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
+
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>
 <script>
@@ -439,13 +449,31 @@
 <div id="s-login" class="screen">
   <div class="login-wrap">
     <div class="card login-card">
-      <h1>Welcome!</h1>
-      <div class="field">
-        <input id="loginQ" type="text" placeholder="Group" autocomplete="off">
-        <div class="seg-mini"><button id="segS" class="sel">Student</button><button id="segT">Teacher</button></div>
+
+      <!-- шаг 1: общий вход в LMS -->
+      <div id="lgLms">
+        <h1>Sign in</h1>
+        <p class="lg-note">Your edu.turin.uz account. The password is sent straight to the university, used once to get an access token, and never saved.</p>
+        <div class="field"><input id="lgUser" type="text" placeholder="Login" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password"></div>
+        <button class="btn" id="lgBtn">Sign in</button>
+        <div class="gr-err" id="lgErr"></div>
+        <button class="lg-skip" id="lgSkip">Skip — just the timetable</button>
       </div>
-      <div class="suggest" id="loginList"></div>
-      <button class="btn" id="loginBtn">Login</button>
+
+      <!-- шаг 2: группа. Сюда ведёт «Пропустить», смена группы и случай,
+           когда группу не удалось определить по профилю автоматически. -->
+      <div id="lgGroup" style="display:none">
+        <h1>Welcome!</h1>
+        <div class="lg-who" id="lgWho"></div>
+        <div class="field">
+          <input id="loginQ" type="text" placeholder="Group" autocomplete="off">
+          <div class="seg-mini"><button id="segS" class="sel">Student</button><button id="segT">Teacher</button></div>
+        </div>
+        <div class="suggest" id="loginList"></div>
+        <button class="btn" id="loginBtn">Login</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -532,12 +560,10 @@
 <div id="s-att" class="screen">
   <div class="pad">
     <!-- вход в LMS: виден, пока нет токена -->
-    <div class="card gr-login" id="grLogin">
+    <div class="card gr-prompt" id="grLogin">
       <h2>Grades</h2>
-      <p class="gr-note">Sign in with your edu.turin.uz account. The password is sent straight to the university, used once to get an access token, and never saved. The token is kept on this device only.</p>
-      <div class="field"><input id="grUser" type="text" placeholder="Login" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-      <div class="field"><input id="grPass" type="password" placeholder="Password" autocomplete="current-password"></div>
-      <button class="btn" id="grBtn">Sign in</button>
+      <p>Sign in with your edu.turin.uz account to see your courses and grades.</p>
+      <button class="btn" id="grSignIn">Sign in</button>
       <div class="gr-err" id="grErr"></div>
     </div>
 
@@ -1097,7 +1123,8 @@ async function refreshGrades(quiet){
       paintGrades(grades);
       setGrStatus(navigator.onLine ? "Could not refresh — showing saved grades" : "Offline — saved grades");
     } else {
-      setGrStatus(""); setGrErr(e.message || "Could not load grades");
+      // здесь мы уже вошли, значит видна карточка оценок, а не приглашение войти
+      setGrStatus(e.message || "Could not load grades");
     }
   } finally { grBusy=false; }
 }
@@ -1132,19 +1159,59 @@ async function toggleCourse(i){
     box.innerHTML=`<div class="it"><span>${esc(e.message||"Could not load")}</span></div>`;
   }
 }
-$("grBtn").onclick=async ()=>{
-  const u=$("grUser").value.trim(), p=$("grPass").value;
-  if(!u||!p){ setGrErr("Enter your login and password"); return; }
-  setGrErr(""); setGrStatus("Signing in…"); $("grBtn").disabled=true;
+/* Кто вошёл и из какой он группы. Группу Moodle прямо не отдаёт, поэтому
+   собираем кандидатов из профиля (кафедра, institution, idnumber, поля
+   профиля) и названий курсов, после чего сверяем со списком групп из
+   расписания. Принимаем только однозначное совпадение: две подходящие
+   группы — повод спросить, а не гадать. */
+async function lmsWhoAmI(){
+  const info=await lmsCall("core_webservice_get_site_info");
+  const cands=[];
+  try{
+    const us=await lmsCall("core_user_get_users_by_field",{field:"id","values[0]":info.userid});
+    const u=(us||[])[0]||{};
+    [u.department,u.institution,u.idnumber].forEach(v=>{ if(v) cands.push(String(v)); });
+    (u.customfields||[]).forEach(f=>{ if(f&&f.value) cands.push(String(f.value)); });
+  }catch(e){}
+  try{
+    const cs=await lmsCall("core_enrol_get_users_courses",{userid:info.userid});
+    (cs||[]).forEach(c=>{ if(c.shortname) cands.push(c.shortname); if(c.fullname) cands.push(c.fullname); });
+  }catch(e){}
+  return { name: info.fullname||"", uid: info.userid, group: matchGroup(cands) };
+}
+function matchGroup(cands){
+  if(!DATA||!DATA.classes||!cands.length) return null;
+  const hay=cands.join(" | ").toUpperCase();
+  const hits=DATA.classes.map(c=>c.name).filter(n=>{
+    const esc=n.toUpperCase().replace(/[.*+?^${}()|[\]\\-]/g,"\\$&");
+    return new RegExp("(^|[^A-Z0-9])"+esc+"([^A-Z0-9]|$)").test(hay);
+  });
+  return hits.length===1 ? hits[0] : null;
+}
+
+$("lgBtn").onclick=async ()=>{
+  const u=$("lgUser").value.trim(), p=$("lgPass").value;
+  if(!u||!p){ $("lgErr").textContent="Enter your login and password"; return; }
+  $("lgErr").textContent=""; $("lgBtn").disabled=true; $("lgBtn").textContent="Signing in…";
   try{
     const t=await lmsLogin(u,p);
-    $("grPass").value="";          // пароль больше не нужен — стираем сразу же
+    $("lgPass").value="";          // пароль больше не нужен — стираем сразу же
     lmsSaveToken(t); haptic();
-    renderGrades();
-  }catch(e){ setGrErr(e.message||"Sign-in failed"); }
-  finally{ setGrStatus(""); $("grBtn").disabled=false; }
+    const who=await lmsWhoAmI();
+    if(who.group){                 // группу определили — второй шаг не нужен
+      profile={kind:"class",name:who.group}; saveProfile(profile);
+      if(tg) try{tg.BackButton.hide();}catch(e){}
+      enterApp();
+    } else {
+      $("lgWho").textContent = who.name ? ("Signed in as "+who.name+" — pick your group") : "";
+      showLogin("group");
+    }
+  }catch(e){ $("lgErr").textContent=e.message||"Sign-in failed"; }
+  finally{ $("lgBtn").disabled=false; $("lgBtn").textContent="Sign in"; }
 };
-$("grPass").onkeydown=e=>{ if(e.key==="Enter") $("grBtn").click(); };
+$("lgPass").onkeydown=e=>{ if(e.key==="Enter") $("lgBtn").click(); };
+$("lgSkip").onclick=()=>{ haptic(); showLogin("group"); };
+$("grSignIn").onclick=()=>{ haptic(); showLogin("lms"); };
 $("grOut").onclick=()=>{ lmsSaveToken(""); lmsSaveGrades(null); haptic(); setGrErr(""); setGrStatus(""); renderGrades(); };
 
 /* ---------- ATTENDANCE ---------- */
@@ -1175,9 +1242,18 @@ function renderProfile(){
 $("changeBtn").onclick=()=>{haptic();showLogin();};
 
 /* ---------- LOGIN ---------- */
-function showLogin(){
+/* Экран входа состоит из двух шагов. Шаг LMS показываем только тому, кто ещё
+   не входил и не выбирал группу; «сменить группу» и повторный заход ведут
+   сразу ко второму шагу, чтобы не требовать пароль лишний раз. */
+function showLogin(step){
   SCREENS.forEach(n=>$("s-"+n).classList.remove("active"));
   $("nav").classList.remove("on"); $("s-login").classList.add("active");
+  const wantLms = step==="lms" || (step!=="group" && !lmsToken && !profile);
+  $("lgLms").style.display   = wantLms ? "" : "none";
+  $("lgGroup").style.display = wantLms ? "none" : "";
+  $("lgErr").textContent="";
+  // уходим с шага входа — поле пароля не должно оставаться заполненным
+  if(!wantLms) $("lgPass").value="";
   $("loginQ").value=""; renderSuggest();
   if(tg&&profile){ try{tg.BackButton.show();tg.BackButton.onClick(()=>{tg.BackButton.hide();enterApp();});}catch(e){} }
 }

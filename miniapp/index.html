@@ -1114,14 +1114,18 @@ function titleCase(s){
     return w.charAt(0).toUpperCase()+w.slice(1);
   }).join(" ");
 }
+/* Похоже на код группы или семестра: «SE-24-I», «SE-25-II-EL», «SE1-24»,
+   «2026», «Autumn 2026». Осмысленный текст вроде «Native and Web» — нет. */
+const CODEISH=/^(?:[A-Za-z]{1,5}[-–_ ]?\d[\w\-–]*|\d[\w.\-/ ]*|(?:autumn|spring|summer|winter|semester|sem)\b[\w .\-/]*)$/i;
 function prettySubject(name){
   const src=String(name||"").trim();
   let t=src.replace(/_+/g," ");
-  // Хвост в скобках убираем, ТОЛЬКО если внутри код группы, год или семестр.
-  // «Mobile Apps (Native and Web)» — часть названия, и терять её нельзя.
-  t=t.replace(/\s*[\[(]([^)\]]*)[\])]\s*$/, (m,inner)=>
-    /^(?:[A-Za-z]{1,4}\d[\w-]*|\d[\w.\-/ ]*|(?:autumn|spring|summer|winter|semester|sem)\b[\w .\-/]*)$/i
-      .test(inner.trim()) ? "" : m);
+  // Скобки срезаем, только если внутри код, а не часть названия:
+  // «Mobile Apps (Native and Web)» терять нельзя.
+  const drop=(m,inner)=> CODEISH.test(inner.trim()) ? "" : m;
+  // ведущий код: «[SE-24-I] Chemistry» — он одинаков во всех строках списка
+  t=t.replace(/^\s*[\[(]([^)\]]*)[\])]\s*/, drop);
+  t=t.replace(/\s*[\[(]([^)\]]*)[\])]\s*$/, drop);
   // Числовых кусков в начале бывает несколько («2.1 26 27 …»), поэтому
   // срезаем всю ведущую череду, а не первый попавшийся.
   t=t.replace(/^(?:[\d.]+[-–_ ]+)+/,"");
@@ -1139,13 +1143,26 @@ function gradePct(v){
   const n=parseFloat(m[0]);
   return isFinite(n) ? n : null;
 }
+/* Порядок важен. Moodle отдаёт сырой балл со словесным вердиктом —
+   «20.00 (Pass)». Число тут ничего не значит: 20 может быть и из 20, и из 100,
+   поэтому пороги по нему врут (именно из-за этого сданные предметы
+   загорались красным). Вердикт — источник точный, его и слушаем в первую
+   очередь. Пороги применимы только к процентам. Сырой балл без шкалы и без
+   вердикта не красим вовсе: выдуманный цвет хуже отсутствующего. */
 function gradeClass(v){
-  const n=gradePct(v);
-  if(n==null) return "";
-  if(n>=85) return "g-hi";
-  if(n>=70) return "g-ok";
-  if(n>=55) return "g-mid";
-  return "g-low";
+  if(v==null) return "";
+  const s=String(v);
+  if(/\bfail(ed)?\b|\bне\s*сдан/i.test(s)) return "g-low";
+  if(/\bpass(ed)?\b|\bзач[её]т|\bсдан/i.test(s)) return "g-hi";
+  if(s.includes("%")){
+    const n=gradePct(s);
+    if(n==null) return "";
+    if(n>=85) return "g-hi";
+    if(n>=70) return "g-ok";
+    if(n>=55) return "g-mid";
+    return "g-low";
+  }
+  return "";
 }
 
 function renderGrades(){

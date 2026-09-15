@@ -454,8 +454,12 @@
   .tg-body { position: relative; display: grid; margin-top: 10px;
     grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr)); }
   .tg-hours { position: relative; }
-  .tg-hours span { position: absolute; right: 10px; transform: translateY(-50%);
-    font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* слева — начало и конец пары, как в дневном списке на телефоне */
+  .tg-hours .sl { position: absolute; right: 10px; text-align: right; line-height: 1.25; }
+  .tg-hours .sl b { display: block; font-size: 12px; font-weight: 600;
+    color: var(--text2); font-variant-numeric: tabular-nums; }
+  .tg-hours .sl i { display: block; font-style: normal; font-size: 10.5px;
+    color: var(--muted); font-variant-numeric: tabular-nums; }
   /* часовые линии рисуем фоном — так они не плодят элементы */
   .tg-col { position: relative; border-left: .5px solid var(--line);
     background-image: repeating-linear-gradient(to bottom,
@@ -984,24 +988,23 @@ function renderTTGrid(){
   else btn.style.display="none";
   const TYPE={lec:"Lecture",prac:"Practice",lab:"Lab",sem:"Seminar"};
 
-  // границы сетки берём из самих пар: рисовать пустые часы незачем
-  let lo=Infinity, hi=-Infinity;
+  /* Строки сетки — пары, а не часы. У пар фиксированные номера (поле p), и
+     строить по ним надёжнее, чем по непрерывной шкале времени: высота строки
+     равна одной паре, а перерывы между ними не растягивают сетку. */
+  const slotMap=new Map();
   for(let i=0;i<6;i++) (W[i]||[]).forEach(e=>{ const [a,b]=e.t.split("–");
-    lo=Math.min(lo,mins(a)); hi=Math.max(hi,mins(b)); });
-  if(!isFinite(lo)){ lo=8*60; hi=18*60; }
-  const from=Math.floor(lo/60)*60, to=Math.ceil(hi/60)*60;
-  /* Высота часа подстраивается под окно: при фиксированных 58px сетка занимала
-     290px из 900 и выглядела тесной, а под ней оставалась пустота. Границы
-     держим разумными, чтобы на низком окне не сплющило, а на высоком не
-     растянуло до нелепого. innerHeight в реальных px — делим на масштаб. */
-  const span=(to-from)/60;
+    if(!slotMap.has(e.p)) slotMap.set(e.p,{ p:e.p, s:mins(a), t:mins(b), a, b }); });
+  const slots=[...slotMap.values()].sort((x,z)=>x.s-z.s);
+  if(!slots.length) slots.push({ p:0, s:8*60, t:9*60+20, a:"08:00", b:"09:20" });
+
+  // высота строки подстраивается под окно, но остаётся в разумных границах
   const avail=(innerHeight/uiScale) - 230;
-  const HH=Math.max(52, Math.min(96, avail/span));
-  const H=span*HH, y=m=>(m-from)/60*HH;
-  const hLabel=h=>((h%12)||12)+(h<12?"am":"pm");
+  const HH=Math.max(64, Math.min(132, avail/slots.length));
+  const H=slots.length*HH, rowTop=idx=>idx*HH;
 
   let hours="";
-  for(let h=from/60; h<=to/60; h++) hours+=`<span style="top:${y(h*60)}px">${hLabel(h)}</span>`;
+  slots.forEach((s,idx)=>{ hours+=`<span class="sl" style="top:${rowTop(idx)+8}px">`
+    + `<b>${esc(s.a)}</b><i>${esc(s.b)}</i></span>`; });
 
   const cols=[...Array(6)].map((_,i)=>{
     const list=(W[i]||[]).map(e=>{ const [a,b]=e.t.split("–");
@@ -1019,22 +1022,33 @@ function renderTTGrid(){
     return `<div class="tg-col">` + list.map(it=>{
       const w=100/it.total, L=it.lane*w;
       const meta=[TYPE[it.e.x]||"", it.e.r||""].filter(Boolean).map(esc).join(" · ");
-      const h=Math.max(28, y(it.t)-y(it.s)-3);
+      // сдвоенная пара занимает столько строк, сколько длится
+      let a=slots.findIndex(s=>s.p===it.e.p);
+      if(a<0) a=Math.max(0, slots.findIndex(s=>s.s>=it.s));
+      let b=a; while(b+1<slots.length && slots[b+1].t<=it.t) b++;
       const tone = it.e.x==="prac" ? " t-prac" : (it.e.x==="lab" ? " t-lab" : "");
-      return `<div class="tg-ev${tone}" style="top:${y(it.s)}px;height:${h}px;`
+      return `<div class="tg-ev${tone}" style="top:${rowTop(a)+2}px;height:${(b-a+1)*HH-6}px;`
            + `left:calc(${L}% + 3px);width:calc(${w}% - 6px)">`
            + `<div class="top"><span class="sj">${esc(clean(it.e.s))}</span>`
-           + `<span class="tm">${esc(it.a)}</span></div>`
+           + `<span class="tm">${esc(it.a)}–${esc(it.b)}</span></div>`
            + (meta?`<div class="mt">${meta}</div>`:"")
            + `</div>`;
     }).join("") + `</div>`;
   }).join("");
 
-  // линия текущего момента: только текущая неделя и только в пределах сетки
+  /* Линия текущего момента. Шкала больше не непрерывная, поэтому внутри пары
+     ведём пропорционально, а в перерыве ставим на границу следующей. */
   let now="";
   if(ttWk===0){
     const n=new Date(), nm=n.getHours()*60+n.getMinutes(), di=(n.getDay()+6)%7;
-    if(di<6 && nm>=from && nm<=to) now=`<div class="tg-now" style="top:${y(nm)}px"></div>`;
+    if(di<6 && nm>=slots[0].s && nm<=slots[slots.length-1].t){
+      let top=null;
+      for(let k=0;k<slots.length;k++){
+        if(nm<slots[k].s){ top=rowTop(k); break; }
+        if(nm<=slots[k].t){ top=rowTop(k)+(nm-slots[k].s)/(slots[k].t-slots[k].s)*HH; break; }
+      }
+      if(top!==null) now=`<div class="tg-now" style="top:${top}px"></div>`;
+    }
   }
 
   $("ttGrid").innerHTML = `<div class="tg" style="--hour-h:${HH}px"><div class="tg-hd"><span></span>`

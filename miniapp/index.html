@@ -470,9 +470,9 @@
   .tg-day b { display: inline-flex; align-items: center; justify-content: center;
     min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
     font-size: 14px; font-weight: 700; color: var(--text); }
-  /* в шапке фоном отмечен только сегодняшний день, остальные дни без плашки */
+  /* в шапке фоном отмечен только сегодняшний день: голубая плашка на всю
+     ячейку, без кружка на числе — выделение и так одно на весь столбец */
   .tg-day.today { background: var(--tint); border-radius: var(--r-sm); }
-  .tg-day.today b { background: var(--accent); color: #fff; }
   /* отступ сверху — подпись первого часа центрируется на линии и выступает
      над сеткой; без него она налезает на границу шапки */
   .tg-body { position: relative; display: grid; margin-top: 10px;

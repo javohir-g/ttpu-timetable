@@ -10,6 +10,12 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<!-- Ярлык на домашнем экране. Android берёт иконку и имя из манифеста,
+     iOS — из apple-touch-icon и мета-тегов ниже. -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TTPU">
 <title>TTPU Student</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">

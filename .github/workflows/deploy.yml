@@ -44,6 +44,7 @@ jobs:
           cp miniapp/data.json  _site/
           cp miniapp/sw.js      _site/
           cp miniapp/icon-*.png _site/
+          cp miniapp/manifest.json _site/
           cp -r miniapp/icons   _site/
 
       - uses: actions/configure-pages@v5

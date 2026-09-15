@@ -364,6 +364,39 @@
   .gr-prompt h2 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
   .gr-prompt p { font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
 
+  /* ================= ЛЕНТА НА ГЛАВНОЙ ================= */
+  /* Строка задания: слева остаток времени цветом, справа отметка сдачи. */
+  .due { display: flex; align-items: center; gap: 10px; padding: 9px 0;
+    border-bottom: .5px solid var(--line); cursor: pointer; }
+  .due:last-of-type { border-bottom: none; }
+  .due .lft { flex: none; min-width: 54px; text-align: center; font-size: 12px; font-weight: 700;
+    padding: 4px 6px; border-radius: 100px; font-variant-numeric: tabular-nums; }
+  .due .lft.d-over  { color: var(--bad);    background: rgba(255,59,48,.14); }
+  .due .lft.d-today { color: var(--warn);   background: rgba(255,149,0,.16); }
+  .due .lft.d-soon  { color: var(--accent); background: var(--tint); }
+  .due .lft.d-far   { color: var(--muted);  background: var(--bg); }
+  .due .mid { flex: 1; min-width: 0; }
+  /* display: block обязателен — это span'ы, иначе название и предмет встают в одну строку */
+  .due .mid .n { display: block; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .due .mid .c { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .due .st { flex: none; width: 17px; height: 17px; color: var(--line); }
+  .due .st.ok { color: var(--ok); }
+  /* подробности раскрываются под строкой, с отступом под плашку времени */
+  .due-det { display: none; padding: 0 0 10px 64px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .due-det.on { display: block; }
+  .due-none { font-size: 12.5px; color: var(--muted); padding: 6px 0; }
+
+  .res { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: .5px solid var(--line); }
+  .res:last-of-type { border-bottom: none; }
+  .res .mid { flex: 1; min-width: 0; }
+  .res .mid .n { display: block; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .res .mid .c { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .res .v { flex: none; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text2); }
+  .res .v.g-hi { color: var(--ok); }
+  .res .v.g-ok { color: var(--accent); }
+  .res .v.g-mid { color: var(--warn); }
+  .res .v.g-low { color: var(--bad); }
+
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>
 <script>
@@ -432,6 +465,15 @@
     <div class="card sec">
       <div class="sec-h" id="homeSeeAll"><h2>Schedule</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
       <div class="sec-b"><div class="minis" id="homeSchedule"></div></div>
+    </div>
+    <!-- обе карточки видны только после входа в LMS -->
+    <div class="card sec" id="homeDueCard" style="display:none">
+      <div class="sec-h" id="homeDueMore"><h2>Due soon</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="sec-b"><div id="homeDue"></div></div>
+    </div>
+    <div class="card sec" id="homeResCard" style="display:none">
+      <div class="sec-h" id="homeResMore"><h2>Latest results</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="sec-b"><div id="homeRes"></div></div>
     </div>
   </div>
 </div>
@@ -725,9 +767,12 @@ function renderHome(){
   $("homeSchedule").innerHTML = today.length ? today.map(e=>`
     <div class="mini" title="${esc(clean(e.s))}"><div class="t">${e.t.split("–")[0]}</div><div class="s">${esc(shortSubj(clean(e.s)))}</div><div class="r">${esc(e.r||"—")}</div></div>`).join("")
     : `<div class="mini none">No classes today</div>`;
+  renderHomeFeed();
 }
 $("homeSeeAll").onclick=()=>{haptic();nav("tt");};
 $("homeProfile").onclick=()=>{haptic();nav("profile");};
+$("homeDueMore").onclick=()=>{haptic();nav("att");};
+$("homeResMore").onclick=()=>{haptic();nav("att");};
 
 /* ---------- TIMETABLE ---------- */
 /* неделя Пн–Сб (6 дней), индексы совпадают с данными */
@@ -977,14 +1022,164 @@ async function lmsLoadGrades(){
       grade: (overview[c.id]===undefined || overview[c.id]==="-") ? null : overview[c.id]
     })) };
 }
+/* mod и when нужны ленте «последние результаты»: по ним отбираем оценённое
+   и сортируем по дате проверки. Экрану оценок лишние поля не мешают. */
 async function lmsCourseItems(courseid,uid){
   const r=await lmsCall("gradereport_user_get_grade_items",{courseid,userid:uid});
   const ug=(r.usergrades||[])[0];
   return ((ug&&ug.gradeitems)||[]).map(it=>({
     name: it.itemname || (it.itemtype==="course" ? "Course total" : (it.itemmodule||"Item")),
     grade: it.gradeformatted || "—",
-    pct: it.percentageformatted && it.percentageformatted!=="-" ? it.percentageformatted : ""
+    pct: it.percentageformatted && it.percentageformatted!=="-" ? it.percentageformatted : "",
+    mod: it.itemmodule || "",
+    when: it.gradedategraded || 0,
+    raw: (it.graderaw===undefined ? null : it.graderaw)
   })).filter(x=>x.name);
+}
+
+/* ---------- ЛЕНТА НА ГЛАВНОЙ: сроки и результаты ---------- */
+/* Сроки берём из календаря Moodle: он отдаёт только события, требующие
+   действия, поэтому само присутствие задания в списке означает «ещё не сдано».
+   Статус сдачи подгружаем по требованию — один запрос на раскрытую строку,
+   а не на все задания сразу. */
+const FEED_KEY="ttpu_feed";
+let feed = (()=>{ try{ const v=localStorage.getItem(FEED_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } })();
+let feedBusy=false;
+function saveFeed(f){ feed=f||null;
+  try{ f ? localStorage.setItem(FEED_KEY,JSON.stringify(f)) : localStorage.removeItem(FEED_KEY); }catch(e){} }
+
+/* Округляем к ближайшему, а не вниз: floor превращал двое суток в «1d», а пять
+   часов в «4h» — то есть занижал остаток времени именно там, где ошибка дороже
+   всего. Порог 24 проверяем по уже округлённым часам, иначе появилось бы «24h». */
+function dueLabel(ts){
+  const ms=ts*1000-Date.now();
+  if(ms<0) return { t:"Late", c:"d-over" };
+  const m=Math.round(ms/60000);
+  if(m<60) return { t:Math.max(1,m)+"m", c:"d-today" };
+  const h=Math.round(ms/3600000);
+  if(h<24) return { t:h+"h", c:"d-today" };
+  const d=Math.max(1,Math.round(ms/86400000));
+  return { t:d+"d", c: d<3 ? "d-soon" : "d-far" };
+}
+async function lmsDeadlines(){
+  // немного назад по времени — чтобы просроченное, но не сданное, тоже попало
+  const from=Math.floor(Date.now()/1000) - 14*86400;
+  const r=await lmsCall("core_calendar_get_action_events_by_timesort",{ timesortfrom:from, limitnum:20 });
+  return ((r&&r.events)||[]).map(e=>({
+    name: e.name || e.activityname || "Task",
+    course: (e.course && (e.course.fullname || e.course.shortname)) || "",
+    when: e.timesort || 0,
+    mod: e.modulename || "",
+    inst: e.instance || 0
+  })).filter(x=>x.when).sort((a,b)=>a.when-b.when).slice(0,6);
+}
+async function lmsSubmission(assignid){
+  const r=await lmsCall("mod_assign_get_submission_status",{assignid});
+  const la=(r&&r.lastattempt)||{};
+  const sub=la.submission||la.teamsubmission||{};
+  const fb=(r&&r.feedback)||{};
+  const strip=s=>String(s||"").replace(/<[^>]*>/g,"").trim();
+  return {
+    status: sub.status||"",
+    submitted: sub.status==="submitted",
+    grade: strip(fb.gradefordisplay),
+    note: strip(fb.plugins && fb.plugins[0] && fb.plugins[0].editorfields
+                && fb.plugins[0].editorfields[0] && fb.plugins[0].editorfields[0].text)
+  };
+}
+async function lmsRecent(courses,uid){
+  const out=[];
+  // по одному запросу на курс — поэтому ограничиваем и ходим последовательно
+  for(const c of courses.slice(0,8)){
+    try{
+      (await lmsCourseItems(c.id,uid)).forEach(it=>{
+        if(it.when && it.raw!==null) out.push({ name:it.name, course:c.name, grade:it.grade, pct:it.pct, when:it.when, mod:it.mod });
+      });
+    }catch(e){}
+  }
+  return out.sort((a,b)=>b.when-a.when).slice(0,6);
+}
+
+const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>';
+const DOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>';
+
+function paintFeed(f){
+  const due=f.due||[];
+  $("homeDue").innerHTML = due.length
+    ? due.map((d,i)=>{
+        const L=dueLabel(d.when);
+        return `<div class="due" data-d="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
+             + `<span class="mid"><span class="n">${esc(prettySubject(d.name))}</span>`
+             + `<span class="c">${esc(prettySubject(d.course))}</span></span>`
+             + `<span class="st" data-st="${i}">${DOT_SVG}</span></div>`
+             + `<div class="due-det" data-det="${i}"></div>`;
+      }).join("")
+    : `<div class="due-none">${esc(f.note || "Nothing due — you are clear")}</div>`;
+  [...$("homeDue").querySelectorAll(".due")].forEach(r=>r.onclick=()=>toggleDue(+r.dataset.d));
+
+  const rec=f.recent||[];
+  $("homeRes").innerHTML = rec.length
+    ? rec.map(r=>`<div class="res"><span class="mid"><span class="n">${esc(prettySubject(r.name))}</span>`
+        + `<span class="c">${esc(prettySubject(r.course))}${r.mod?" · "+esc(r.mod):""}</span></span>`
+        + `<span class="v ${gradeClass(r.pct||r.grade)}">${esc(r.grade)}</span></div>`).join("")
+    : `<div class="due-none">No graded work yet</div>`;
+}
+/* Раскрытие строки: запрашиваем статус сдачи только здесь и только один раз. */
+async function toggleDue(i){
+  const box=$("homeDue").querySelector(`.due-det[data-det="${i}"]`);
+  if(!box) return;
+  haptic();
+  if(box.classList.contains("on")){ box.classList.remove("on"); return; }
+  box.classList.add("on");
+  const d=(feed&&feed.due||[])[i]; if(!d) return;
+  const when=new Date(d.when*1000).toLocaleString();
+  if(box.dataset.done){ return; }
+  box.innerHTML=`${esc(when)}`;
+  if(d.mod!=="assign" || !d.inst){ box.dataset.done="1"; return; }
+  try{
+    const s=await lmsSubmission(d.inst);
+    box.dataset.done="1";
+    const st = s.submitted ? "Submitted" : (s.status==="draft" ? "Draft — not submitted" : "Not submitted");
+    box.innerHTML = `${esc(when)}<br>${esc(st)}`
+      + (s.grade ? `<br>Grade: ${esc(s.grade)}` : "")
+      + (s.note ? `<br>${esc(s.note.slice(0,160))}` : "");
+    if(s.submitted){ const m=$("homeDue").querySelector(`.st[data-st="${i}"]`); if(m){ m.classList.add("ok"); m.innerHTML=CHECK_SVG; } }
+  }catch(e){
+    box.innerHTML=`${esc(when)}<br>${esc(e.message||"Could not load status")}`;
+  }
+}
+function renderHomeFeed(){
+  const on=!!lmsToken;
+  $("homeDueCard").style.display = on ? "" : "none";
+  $("homeResCard").style.display = on ? "" : "none";
+  if(!on) return;
+  if(feed) paintFeed(feed);
+  if(navigator.onLine && (!feed || Date.now()-(feed.updated||0) > GR_MAX_AGE)) refreshFeed(!!feed);
+}
+async function refreshFeed(quiet){
+  if(feedBusy || !lmsToken) return;
+  feedBusy=true;
+  if(!quiet) $("homeDue").innerHTML=`<div class="due-none">Loading…</div>`;
+  try{
+    const info=await lmsCall("core_webservice_get_site_info");
+    const uid=info.userid;
+    // site_info перечисляет разрешённые функции — если нужной нет, честно пишем об этом,
+    // иначе пустая карточка выглядела бы как «заданий нет»
+    const fns=new Set((info.functions||[]).map(x=>x.name));
+    const f={ updated:Date.now(), due:[], recent:[], note:"" };
+    if(fns.has("core_calendar_get_action_events_by_timesort")){
+      try{ f.due=await lmsDeadlines(); }catch(e){ f.note="Deadlines unavailable: "+(e.code||e.message||"error"); }
+    } else f.note="Deadlines: calendar function not open for this account";
+    let courses=[];
+    try{ courses=(await lmsCall("core_enrol_get_users_courses",{userid:uid}))||[]; }catch(e){}
+    try{
+      f.recent=await lmsRecent(courses.map(c=>({id:c.id,name:c.fullname||c.shortname||("Course "+c.id)})),uid);
+    }catch(e){}
+    saveFeed(f); paintFeed(f);
+  }catch(e){
+    if(feed) paintFeed(feed);
+    else $("homeDue").innerHTML=`<div class="due-none">${esc(e.message||"Could not load")}</div>`;
+  } finally { feedBusy=false; }
 }
 
 const setGrStatus = t => { $("grStatus").textContent = t||""; };
@@ -1222,7 +1417,7 @@ function showLogin(){
    вернётся из CloudStorage при следующем запуске и выход окажется мнимым. */
 function logout(){
   haptic();
-  lmsSaveToken(""); lmsSaveGrades(null);
+  lmsSaveToken(""); lmsSaveGrades(null); saveFeed(null);
   profile=null;
   try{ localStorage.removeItem("ttpu_profile"); }catch(e){}
   if(hasCloud) try{ tg.CloudStorage.removeItems(["profile"],()=>{}); }catch(e){}

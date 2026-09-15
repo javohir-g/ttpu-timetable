@@ -236,7 +236,12 @@
   .demo-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
 
   /* ================= NAV ================= */
-  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x); bottom: calc(14px + var(--safe-bot));
+  /* Отступ под домашнюю полосу НЕ складываем со своим: 14 + 34 поднимало меню
+     заметно высоко. Берём наибольшее — на телефоне с полосой меню встаёт вровень
+     с ней, без неё остаётся 14px. Первая строка — запасная: браузер без max()
+     её и возьмёт, вместо того чтобы остаться вовсе без bottom. */
+  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x);
+    bottom: 14px; bottom: max(14px, var(--safe-bot));
     z-index: 30; display: none; align-items: center; justify-content: space-between;
     padding: 9px 22px; border-radius: 20px;
     /* матовое стекло: контент под меню размывается, фон страницы не подкрашивается */
@@ -289,7 +294,9 @@
   /* ================= ОФЛАЙН ================= */
   /* Плашка висит над нижним меню: так она не перекрывает липкую шапку
      расписания и не сдвигает вёрстку, когда появляется и исчезает. */
-  .offline { position: fixed; left: 50%; bottom: calc(92px + var(--safe-bot)); z-index: 40;
+  /* держится на той же высоте относительно меню, что и раньше */
+  .offline { position: fixed; left: 50%; z-index: 40;
+    bottom: 92px; bottom: calc(78px + max(14px, var(--safe-bot)));
     display: flex; align-items: center; gap: 7px;
     max-width: calc(100% - var(--pad-x) * 4);
     padding: 8px 14px; border-radius: 100px;

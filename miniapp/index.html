@@ -110,6 +110,14 @@
     font-size: 16px; padding: 12px 40px 12px 12px; border-radius: var(--r-md); outline: none; }
   .field input::placeholder { color: var(--muted); }
   .field input:focus { border-color: var(--accent); }
+  /* подсказки групп: список под полем, появляется по мере ввода */
+  .suggest { max-height: 168px; overflow-y: auto; margin: -6px 0 12px; border-radius: var(--r-md);
+    background: var(--field); border: 1px solid var(--field-b); display: none; }
+  .suggest.on { display: block; }
+  .suggest button { display: block; width: 100%; text-align: left; border: none; background: none;
+    color: var(--text); font-size: 15px; padding: 10px 12px; cursor: pointer; border-bottom: .5px solid var(--line); }
+  .suggest button:last-child { border-bottom: none; }
+  .suggest button:active { background: var(--tint); }
 
   /* ================= HOME ================= */
 
@@ -384,7 +392,9 @@
       <!-- Единственный экран входа. Группу не спрашиваем — она приходит из Moodle. -->
       <div id="lgLms">
         <h1>Sign in</h1>
-        <p class="lg-note">Your edu.turin.uz account. The password is sent straight to the university, used once to get an access token, and never saved.</p>
+        <p class="lg-note">Your group and your edu.turin.uz account. The password is sent straight to the university, used once to get an access token, and never saved.</p>
+        <div class="field"><input id="lgGrp" type="text" placeholder="Group, e.g. SE1-24" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+        <div class="suggest" id="lgList"></div>
         <div class="field"><input id="lgUser" type="text" placeholder="Login" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
         <div class="field"><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password"></div>
         <button class="btn" id="lgBtn">Sign in</button>
@@ -721,16 +731,6 @@ function renderTT(){
   });
   movePill(first);
   const day = days()[ttSel]||[];
-  // Группу не спрашиваем, поэтому её отсутствие надо объяснить прямо здесь,
-  // показав, что именно вернул Moodle — иначе экран выглядит просто пустым.
-  if(!profile.name){
-    const found=(profile.groupNames||[]).join(", ");
-    $("ttBody").innerHTML=`<div class="empty"><div class="t">Group unknown</div>`
-      + `Moodle did not return a group matching the timetable.`
-      + (found ? `<br>It returned: ${esc(found)}` : "")
-      + `</div>`;
-    animateDay(dir); return;
-  }
   if(!day.length){ $("ttBody").innerHTML=`<div class="empty"><div class="t">No classes</div>Enjoy your free day</div>`; animateDay(dir); return; }
   let h="";
   day.forEach((e,i)=>{
@@ -1107,71 +1107,55 @@ async function toggleCourse(i){
    профиля) и названий курсов, после чего сверяем со списком групп из
    расписания. Принимаем только однозначное совпадение: две подходящие
    группы — повод спросить, а не гадать. */
+/* Автоопределение группы убрано: на этом Moodle её нет ни в группах — там
+   административный флаг «Exam Allowed», — ни в кодах курсов, где записаны
+   только направление, набор и семестр («SE-24-I»), но не номер группы.
+   Извлекать нечего, поэтому группу вводит пользователь. Отсюда берём имя. */
 async function lmsWhoAmI(){
   const info=await lmsCall("core_webservice_get_site_info");
-  const uid=info.userid;
-  let courses=[];
-  try{ courses=(await lmsCall("core_enrol_get_users_courses",{userid:uid}))||[]; }catch(e){}
-
-  /* Главный источник — настоящие группы Moodle: именно в них обычно записан
-     учебный код вроде SE1-24. Сначала спрашиваем сразу по всем курсам
-     (courseid=0), а если сайт так не умеет — обходим курсы по одному. */
-  const groupNames=[];
-  const grab=async p=>{
-    try{
-      const r=await lmsCall("core_group_get_course_user_groups",p);
-      ((r&&r.groups)||[]).forEach(g=>{ if(g&&g.name) groupNames.push(String(g.name)); });
-    }catch(e){}
-  };
-  await grab({userid:uid,courseid:0});
-  if(!groupNames.length)
-    for(const c of courses.slice(0,6)) await grab({userid:uid,courseid:c.id});
-
-  let group=matchGroup(groupNames);
-  if(!group){
-    // запасные источники: поля профиля и названия курсов
-    const cands=[];
-    try{
-      const us=await lmsCall("core_user_get_users_by_field",{field:"id","values[0]":uid});
-      const u=(us||[])[0]||{};
-      [u.department,u.institution,u.idnumber].forEach(v=>{ if(v) cands.push(String(v)); });
-      (u.customfields||[]).forEach(f=>{ if(f&&f.value) cands.push(String(f.value)); });
-    }catch(e){}
-    courses.forEach(c=>{ if(c.shortname) cands.push(c.shortname); if(c.fullname) cands.push(c.fullname); });
-    group=matchGroup(cands);
-  }
-  return { name: info.fullname||"", uid, group, groupNames };
+  return { name: info.fullname||"", uid: info.userid };
 }
-function matchGroup(cands){
-  if(!DATA||!DATA.classes||!cands||!cands.length) return null;
+/* Группу принимаем только из списка расписания: свободный ввод дал бы
+   название, которого нет в данных, и расписание молча оказалось бы пустым.
+   Незаконченный ввод принимаем, если под него подходит ровно одна группа. */
+function resolveGroup(q){
+  if(!DATA||!DATA.classes) return null;
+  const s=String(q||"").trim().toUpperCase();
+  if(!s) return null;
   const names=DATA.classes.map(c=>c.name);
-  // Точное совпадение с целым значением — самый надёжный случай: имя группы
-  // Moodle совпадает с названием группы в расписании один в один.
-  const up=cands.map(s=>String(s).trim().toUpperCase());
-  const exact=names.filter(n=>up.includes(n.toUpperCase()));
-  if(exact.length===1) return exact[0];
-  // иначе ищем код внутри строки, но принимаем только однозначное совпадение
-  const hay=cands.join(" | ").toUpperCase();
-  const hits=names.filter(n=>{
-    const esc=n.toUpperCase().replace(/[.*+?^${}()|[\]\\-]/g,"\\$&");
-    return new RegExp("(^|[^A-Z0-9])"+esc+"([^A-Z0-9]|$)").test(hay);
-  });
+  const exact=names.find(n=>n.toUpperCase()===s);
+  if(exact) return exact;
+  const hits=names.filter(n=>n.toUpperCase().startsWith(s));
   return hits.length===1 ? hits[0] : null;
 }
+function renderGroupSuggest(){
+  const q=$("lgGrp").value.trim().toUpperCase();
+  const items=((DATA&&DATA.classes)?DATA.classes.map(c=>c.name):[])
+    .filter(n=>q && n.toUpperCase().includes(q)).slice(0,20);
+  $("lgList").classList.toggle("on", items.length>0);
+  $("lgList").innerHTML=items.map(n=>`<button type="button">${esc(n)}</button>`).join("");
+  [...$("lgList").children].forEach((b,i)=>b.onclick=()=>{
+    $("lgGrp").value=items[i]; $("lgList").classList.remove("on"); $("lgErr").textContent="";
+  });
+}
+$("lgGrp").oninput=renderGroupSuggest;
+$("lgGrp").onkeydown=e=>{ if(e.key==="Enter"){ $("lgList").classList.remove("on"); $("lgUser").focus(); } };
 
 $("lgBtn").onclick=async ()=>{
+  const g=resolveGroup($("lgGrp").value);
   const u=$("lgUser").value.trim(), p=$("lgPass").value;
+  // Группу проверяем до сети: незачем гонять пароль, если ввод всё равно негоден
+  if(!g){ $("lgErr").textContent="Pick your group from the list"; return; }
   if(!u||!p){ $("lgErr").textContent="Enter your login and password"; return; }
-  $("lgErr").textContent=""; $("lgBtn").disabled=true; $("lgBtn").textContent="Signing in…";
+  $("lgErr").textContent=""; $("lgList").classList.remove("on");
+  $("lgBtn").disabled=true; $("lgBtn").textContent="Signing in…";
   try{
     const t=await lmsLogin(u,p);
     $("lgPass").value="";          // пароль больше не нужен — стираем сразу же
     lmsSaveToken(t); haptic();
-    const who=await lmsWhoAmI();
-    // Группу не спрашиваем ни при каких условиях. Если Moodle её не дал —
-    // входим без неё: оценки работают, а расписание само объяснит, чего нет.
-    profile={ kind:"class", name:who.group||null, who:who.name||"",
-              groupNames:(who.groupNames||[]).filter(Boolean).slice(0,4) };
+    let who={};
+    try{ who=await lmsWhoAmI(); }catch(e){}   // имя необязательно: вход уже состоялся
+    profile={ kind:"class", name:g, who:who.name||"" };
     saveProfile(profile);
     if(tg) try{tg.BackButton.hide();}catch(e){}
     enterApp();
@@ -1218,7 +1202,7 @@ function logout(){
   try{ localStorage.removeItem("ttpu_profile"); }catch(e){}
   if(hasCloud) try{ tg.CloudStorage.removeItems(["profile"],()=>{}); }catch(e){}
   setGrErr(""); setGrStatus("");
-  $("lgUser").value=""; $("lgPass").value="";
+  $("lgUser").value=""; $("lgPass").value=""; $("lgGrp").value=""; $("lgList").classList.remove("on");
   if(tg) try{ tg.BackButton.hide(); }catch(e){}
   showLogin();
 }
@@ -1251,7 +1235,9 @@ function start(d,cached){
   // чтения — и он немедленно вернётся обратно, сделав сброс бессмысленным.
   let went=false;
   const go=()=>{ if(went) return; went=true;
-    loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); }); };
+    // profile.name обязателен: у профилей, сохранённых прошлой версией, группы
+    // может не быть — таких отправляем на вход, иначе расписание будет пустым
+    loadProfile(p=>{ profile=p; if(profile && profile.name) enterApp(); else showLogin(); }); };
   if(window.__ttpuReset && hasCloud){
     try{ tg.CloudStorage.removeItems(["profile","theme","ui"],()=>go()); }catch(e){ go(); }
     setTimeout(go,2500);   // облако не ответило — не зависаем на экране загрузки

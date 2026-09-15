@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- maximum-scale/user-scalable запрещают щипковый зум и двойной тап;
+     interactive-widget=resizes-content заставляет клавиатуру ужимать раскладку,
+     а не масштабировать видимую область. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#F2F2F7">
 <title>TTPU Student</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -61,7 +64,9 @@
      Именно clip, а не hidden: hidden сделал бы html контейнером прокрутки
      и сломал бы position: sticky у шапки расписания. */
   html { height: 100%; overflow-x: clip; }
-  html, body { scrollbar-width: none; -ms-overflow-style: none; }
+  /* pan-x pan-y оставляет прокрутку, но убирает щипковый зум и двойной тап —
+     это работает даже там, где параметры viewport игнорируются. */
+  html, body { scrollbar-width: none; -ms-overflow-style: none; touch-action: pan-x pan-y; }
   /* высота body тоже попадает под zoom, поэтому компенсируем делением — иначе при
      увеличении на пустой странице появляется лишняя прокрутка */
   body { min-height: calc(100% / var(--ui)); }
@@ -95,7 +100,9 @@
   .lbl { font-size: 11.5px; font-weight: 600; color: var(--text2); margin: 0 0 6px 2px; }
   .field { position: relative; margin-bottom: 12px; }
   .field input { width: 100%; border: 1px solid var(--field-b); background: var(--field); color: var(--text);
-    font-size: 14px; padding: 12px 40px 12px 12px; border-radius: var(--r-md); outline: none; }
+    /* Ровно 16px и не меньше: при меньшем шрифте iOS/WebKit сам приближает
+       страницу, как только фокус попадает в поле. Не уменьшать. */
+    font-size: 16px; padding: 12px 40px 12px 12px; border-radius: var(--r-md); outline: none; }
   .field input::placeholder { color: var(--muted); }
   .field input:focus { border-color: var(--accent); }
   .field .seg-mini { position: absolute; right: 6px; top: 6px; bottom: 6px; display: flex; gap: 3px; }
@@ -1166,23 +1173,50 @@ async function toggleCourse(i){
    группы — повод спросить, а не гадать. */
 async function lmsWhoAmI(){
   const info=await lmsCall("core_webservice_get_site_info");
-  const cands=[];
-  try{
-    const us=await lmsCall("core_user_get_users_by_field",{field:"id","values[0]":info.userid});
-    const u=(us||[])[0]||{};
-    [u.department,u.institution,u.idnumber].forEach(v=>{ if(v) cands.push(String(v)); });
-    (u.customfields||[]).forEach(f=>{ if(f&&f.value) cands.push(String(f.value)); });
-  }catch(e){}
-  try{
-    const cs=await lmsCall("core_enrol_get_users_courses",{userid:info.userid});
-    (cs||[]).forEach(c=>{ if(c.shortname) cands.push(c.shortname); if(c.fullname) cands.push(c.fullname); });
-  }catch(e){}
-  return { name: info.fullname||"", uid: info.userid, group: matchGroup(cands) };
+  const uid=info.userid;
+  let courses=[];
+  try{ courses=(await lmsCall("core_enrol_get_users_courses",{userid:uid}))||[]; }catch(e){}
+
+  /* Главный источник — настоящие группы Moodle: именно в них обычно записан
+     учебный код вроде SE1-24. Сначала спрашиваем сразу по всем курсам
+     (courseid=0), а если сайт так не умеет — обходим курсы по одному. */
+  const groupNames=[];
+  const grab=async p=>{
+    try{
+      const r=await lmsCall("core_group_get_course_user_groups",p);
+      ((r&&r.groups)||[]).forEach(g=>{ if(g&&g.name) groupNames.push(String(g.name)); });
+    }catch(e){}
+  };
+  await grab({userid:uid,courseid:0});
+  if(!groupNames.length)
+    for(const c of courses.slice(0,6)) await grab({userid:uid,courseid:c.id});
+
+  let group=matchGroup(groupNames);
+  if(!group){
+    // запасные источники: поля профиля и названия курсов
+    const cands=[];
+    try{
+      const us=await lmsCall("core_user_get_users_by_field",{field:"id","values[0]":uid});
+      const u=(us||[])[0]||{};
+      [u.department,u.institution,u.idnumber].forEach(v=>{ if(v) cands.push(String(v)); });
+      (u.customfields||[]).forEach(f=>{ if(f&&f.value) cands.push(String(f.value)); });
+    }catch(e){}
+    courses.forEach(c=>{ if(c.shortname) cands.push(c.shortname); if(c.fullname) cands.push(c.fullname); });
+    group=matchGroup(cands);
+  }
+  return { name: info.fullname||"", uid, group, groupNames };
 }
 function matchGroup(cands){
-  if(!DATA||!DATA.classes||!cands.length) return null;
+  if(!DATA||!DATA.classes||!cands||!cands.length) return null;
+  const names=DATA.classes.map(c=>c.name);
+  // Точное совпадение с целым значением — самый надёжный случай: имя группы
+  // Moodle совпадает с названием группы в расписании один в один.
+  const up=cands.map(s=>String(s).trim().toUpperCase());
+  const exact=names.filter(n=>up.includes(n.toUpperCase()));
+  if(exact.length===1) return exact[0];
+  // иначе ищем код внутри строки, но принимаем только однозначное совпадение
   const hay=cands.join(" | ").toUpperCase();
-  const hits=DATA.classes.map(c=>c.name).filter(n=>{
+  const hits=names.filter(n=>{
     const esc=n.toUpperCase().replace(/[.*+?^${}()|[\]\\-]/g,"\\$&");
     return new RegExp("(^|[^A-Z0-9])"+esc+"([^A-Z0-9]|$)").test(hay);
   });
@@ -1203,7 +1237,12 @@ $("lgBtn").onclick=async ()=>{
       if(tg) try{tg.BackButton.hide();}catch(e){}
       enterApp();
     } else {
-      $("lgWho").textContent = who.name ? ("Signed in as "+who.name+" — pick your group") : "";
+      // Показываем, что именно вернул Moodle: молчаливое «выберите группу»
+      // не даёт понять, почему автоопределение не сработало.
+      const found=(who.groupNames||[]).filter(Boolean).slice(0,3).join(", ");
+      $("lgWho").textContent = (who.name ? "Signed in as "+who.name+". " : "")
+        + (found ? "Moodle groups: "+found+" — none match the timetable, pick yours."
+                 : "Moodle has no group for you — pick yours.");
       showLogin("group");
     }
   }catch(e){ $("lgErr").textContent=e.message||"Sign-in failed"; }

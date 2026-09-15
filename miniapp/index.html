@@ -32,6 +32,7 @@
     --text2: #3C3C43;
     --muted: #8E8E93;
     --line: #E5E5EA;
+    --stripe: #F6F6F9;   /* полоса через день в сетке расписания */
     --field: #FFFFFF;
     --field-b: #D9D9DE;
     /* цветовая индикация оценок */
@@ -81,6 +82,7 @@
       --sb6:#351B27; --sf6:#FF8FB3;
       --sb7:#2C2A14; --sf7:#D6C64A;
       --sb8:#24282F; --sf8:#AAB4C4;
+      --stripe: #232326;
     }
   }
   :root[data-theme="dark"] {
@@ -96,6 +98,7 @@
     --sb6:#351B27; --sf6:#FF8FB3;
     --sb7:#2C2A14; --sf7:#D6C64A;
     --sb8:#24282F; --sf8:#AAB4C4;
+    --stripe: #232326;
   }
   /* смена темы не должна выглядеть как перезагрузка страницы */
   body, .card, .nav, .lesson, .mini, .field input, .seg {
@@ -463,10 +466,7 @@
     background: var(--card); border-radius: var(--r-lg); padding: 14px 14px 18px; }
   .tg-hd { display: grid; grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr));
     align-items: center; padding-bottom: 10px; border-bottom: .5px solid var(--line); }
-  /* шапка дней в рамках, как ячейки таблицы */
-  .tg-day { text-align: center; font-size: 12px; color: var(--muted);
-    padding: 6px 0; border-left: .5px solid var(--line); }
-  .tg-day:last-child { border-right: .5px solid var(--line); }
+  .tg-day { text-align: center; font-size: 12px; color: var(--muted); padding: 6px 0; }
   .tg-day b { display: inline-flex; align-items: center; justify-content: center;
     min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
     font-size: 14px; font-weight: 700; color: var(--text); }
@@ -483,12 +483,15 @@
   .tg-hours .sl i { display: block; font-style: normal; font-size: 10.5px;
     color: var(--muted); font-variant-numeric: tabular-nums; }
   /* часовые линии рисуем фоном — так они не плодят элементы */
-  .tg-col { position: relative; border-left: .5px solid var(--line);
+  .tg-col { position: relative;
     background-image: repeating-linear-gradient(to bottom,
       var(--line) 0, var(--line) .5px, transparent .5px, transparent var(--hour-h)); }
-  .tg-col:last-of-type { border-right: .5px solid var(--line); }
-  /* Блок пары: название слева, время справа одной строкой. Боковой полоски нет —
-     цвет несёт сама подложка, как в образце. */
+  /* Вертикальных линеек нет — дни разделяет полоса через один. И шапка, и тело
+     сетки начинаются со служебной ячейки (пустой уголок, колонка времени),
+     поэтому even в обоих списках попадает на одни и те же дни. */
+  .tg-day:nth-child(even), .tg-col:nth-child(even) { background-color: var(--stripe); }
+  /* Блок пары: название, тип с аудиторией, преподаватель. Времени нет — оно
+     стоит на оси слева. Цвет несёт сама подложка, боковой полоски нет. */
   .tg-ev { position: absolute; overflow: hidden; background: var(--tint);
     border-radius: var(--r-md); padding: 6px 8px; }
   /* время не пишем: оно уже стоит слева на своей строке */

@@ -36,6 +36,8 @@
     --field-b: #D9D9DE;
     /* цветовая индикация оценок */
     --ok: #34C759; --warn: #FF9500; --bad: #FF3B30;
+    /* подложки под цвет типа занятия — подбираются под тему, как --tint */
+    --tint-ok: #E8F7ED; --tint-warn: #FFF2E2;
     /* Эталон — экран расписания: поля страницы 12, зазор между карточками 10,
        карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
     --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
@@ -63,6 +65,7 @@
       --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
       --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
       --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
+      --tint-ok: #16301F; --tint-warn: #33250F;
     }
   }
   :root[data-theme="dark"] {
@@ -70,6 +73,7 @@
     --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
     --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
     --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
+    --tint-ok: #16301F; --tint-warn: #33250F;
   }
   /* смена темы не должна выглядеть как перезагрузка страницы */
   body, .card, .nav, .lesson, .mini, .field input, .seg {
@@ -437,7 +441,10 @@
     background: var(--card); border-radius: var(--r-lg); padding: 14px 14px 18px; }
   .tg-hd { display: grid; grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr));
     align-items: center; padding-bottom: 10px; border-bottom: .5px solid var(--line); }
-  .tg-day { text-align: center; font-size: 12px; color: var(--muted); }
+  /* шапка дней в рамках, как ячейки таблицы */
+  .tg-day { text-align: center; font-size: 12px; color: var(--muted);
+    padding: 6px 0; border-left: .5px solid var(--line); }
+  .tg-day:last-child { border-right: .5px solid var(--line); }
   .tg-day b { display: inline-flex; align-items: center; justify-content: center;
     min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
     font-size: 14px; font-weight: 700; color: var(--text); }
@@ -453,13 +460,24 @@
   .tg-col { position: relative; border-left: .5px solid var(--line);
     background-image: repeating-linear-gradient(to bottom,
       var(--line) 0, var(--line) .5px, transparent .5px, transparent var(--hour-h)); }
+  .tg-col:last-of-type { border-right: .5px solid var(--line); }
+  /* Блок пары: название слева, время справа одной строкой. Боковой полоски нет —
+     цвет несёт сама подложка, как в образце. */
   .tg-ev { position: absolute; overflow: hidden; background: var(--tint);
-    border-radius: var(--r-md); padding: 5px 7px 5px 10px; }
-  .tg-ev::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
-  .tg-ev .sj { font-size: 12px; font-weight: 700; color: var(--accent-d); line-height: 1.2; }
-  .tg-ev .tm { font-size: 10.5px; color: var(--accent); margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .tg-ev .mt { font-size: 10.5px; color: var(--accent); opacity: .8; margin-top: 1px;
+    border-radius: var(--r-md); padding: 6px 8px; }
+  .tg-ev .top { display: flex; align-items: baseline; gap: 6px; }
+  .tg-ev .sj { flex: 1; min-width: 0; font-size: 12px; font-weight: 700;
+    color: var(--accent-d); line-height: 1.25; }
+  .tg-ev .tm { flex: none; font-size: 10.5px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .tg-ev .mt { font-size: 10.5px; color: var(--accent); opacity: .8; margin-top: 3px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Цвет по типу занятия: та же многоцветность, что в образце, но осмысленная.
+     Подложки — токены под обе темы: полупрозрачная rgba поверх тёмной карточки
+     давала мутный оттенок и плохо читаемый текст. */
+  .tg-ev.t-prac { background: var(--tint-ok); }
+  .tg-ev.t-prac .sj, .tg-ev.t-prac .tm, .tg-ev.t-prac .mt { color: var(--ok); }
+  .tg-ev.t-lab { background: var(--tint-warn); }
+  .tg-ev.t-lab .sj, .tg-ev.t-lab .tm, .tg-ev.t-lab .mt { color: var(--warn); }
   /* линия текущего момента — только на текущей неделе */
   .tg-now { position: absolute; left: var(--tg-gutter); right: 0; height: 0;
     border-top: 1px dashed var(--bad); pointer-events: none; z-index: 3; }
@@ -980,7 +998,7 @@ function renderTTGrid(){
   const avail=(innerHeight/uiScale) - 230;
   const HH=Math.max(52, Math.min(96, avail/span));
   const H=span*HH, y=m=>(m-from)/60*HH;
-  const hLabel=h=>((h%12)||12)+(h<12?" AM":" PM");
+  const hLabel=h=>((h%12)||12)+(h<12?"am":"pm");
 
   let hours="";
   for(let h=from/60; h<=to/60; h++) hours+=`<span style="top:${y(h*60)}px">${hLabel(h)}</span>`;
@@ -1002,10 +1020,11 @@ function renderTTGrid(){
       const w=100/it.total, L=it.lane*w;
       const meta=[TYPE[it.e.x]||"", it.e.r||""].filter(Boolean).map(esc).join(" · ");
       const h=Math.max(28, y(it.t)-y(it.s)-3);
-      return `<div class="tg-ev" style="top:${y(it.s)}px;height:${h}px;`
+      const tone = it.e.x==="prac" ? " t-prac" : (it.e.x==="lab" ? " t-lab" : "");
+      return `<div class="tg-ev${tone}" style="top:${y(it.s)}px;height:${h}px;`
            + `left:calc(${L}% + 3px);width:calc(${w}% - 6px)">`
-           + `<div class="sj">${esc(clean(it.e.s))}</div>`
-           + `<div class="tm">${esc(it.a)}</div>`
+           + `<div class="top"><span class="sj">${esc(clean(it.e.s))}</span>`
+           + `<span class="tm">${esc(it.a)}</span></div>`
            + (meta?`<div class="mt">${meta}</div>`:"")
            + `</div>`;
     }).join("") + `</div>`;

@@ -187,8 +187,13 @@
   .mini.none { background: var(--bg); color: var(--muted); font-size: 13px; padding: 20px 8px; flex-basis: 100%; }
 
   /* ================= TIMETABLE (1:1 with Figma) ================= */
-  /* pan-y: вертикальную прокрутку отдаём браузеру, горизонталь обрабатываем сами (свайп по дням) */
-  #s-tt { touch-action: pan-y; }
+  /* pan-y на всех листаемых экранах: вертикальную прокрутку отдаём браузеру,
+     горизонталь — свайпам (дни на расписании, вкладки на остальных). Раньше так
+     было только у расписания, а прочие наследовали от html pan-x pan-y: Chrome
+     забирал горизонтальный жест себе и обрывал свайп вкладок на полпути.
+     Горизонтальную ленту .minis это не задевает — у прокручиваемого блока
+     браузер считает touch-action заново, без ограничений от предков. */
+  #s-home, #s-tt, #s-att, #s-profile { touch-action: pan-y; }
   .tt { padding: 0 var(--pad-x) var(--pad-b); }
   /* шапка расписания закрепляется при прокрутке: дата и строка дней остаются на экране.
      Общая обёртка с фоном страницы — иначе в зазор между карточками просвечивал бы контент. */
@@ -1169,62 +1174,87 @@ function animateScreen(id, dir){
 }
 $("ttToday").onclick=()=>{ttWk=0;ttSel=todayIndex();ttDirHint=0;haptic();renderTT();};
 
-/* Свайп по расписанию: влево — следующий день, вправо — предыдущий.
-   Список тянется за пальцем; на отпускании либо переключает день, либо отпружинивает. */
-(function(){
-  const zone=$("s-tt"), body=()=>$("ttBody");
-  let x0=null, y0=null, axis=null, t0=0, moved=false, dragEndAt=0;
-  const release=(spring)=>{ const b=body();
+/* Горизонтальный свайп — один механизм и для дней расписания, и для вкладок.
+   Содержимое тянется за пальцем; на отпускании либо листает, либо отпружинивает.
+   Прежде это были две копии одного кода, и обе ошибались одинаково:
+   - pointercancel считался отпусканием пальца. Браузер присылает его, когда сам
+     забирает жест (прокрутка, системный «назад»), и координаты в нём часто нулевые:
+     выходил «длинный смах влево», и экран листался вперёд, куда бы ни вёл палец.
+     Теперь отмена только возвращает содержимое на место;
+   - учитывается один палец. Второй раньше перезаписывал точку старта, и список
+     прыгал; теперь он отменяет жест — щипок не должен листать;
+   - когда жест признан горизонтальным, touchmove гасится: iOS иначе продолжает
+     вертикальную прокрутку, и список едет по диагонали;
+   - таймер пружины сбрасывается новым жестом: старый снимал transition посреди
+     следующей пружины, и она обрывалась рывком. */
+function bindSwipe(target, o){
+  let id=null, x0=0, y0=0, t0=0, axis=null, el=null, dragEndAt=0, springT=0;
+  const settle=(b, spring)=>{
+    clearTimeout(springT);
     b.style.transition = spring ? "transform .28s cubic-bezier(.3,1.2,.5,1), opacity .2s ease" : "";
     b.style.transform=""; b.style.opacity="";
-    if(spring) setTimeout(()=>{ b.style.transition=""; },300);
+    if(spring) springT=setTimeout(()=>{ b.style.transition=""; },300);
   };
-  zone.addEventListener("pointerdown",e=>{
+  // сброс жеста; возвращает элемент, который тянули
+  const stop=()=>{ const b=el; if(axis==="x") dragEndAt=Date.now(); id=null; axis=null; el=null; return b; };
+  const abort=()=>{ const wasX=(axis==="x"), b=stop(); if(b && wasX) settle(b,true); };
+  target.addEventListener("pointerdown",e=>{
     if(e.pointerType==="mouse" && e.button!==0) return;
-    if(isWide()) return;            // на десктопе видна вся неделя, листать нечего
-    x0=e.clientX; y0=e.clientY; axis=null; t0=Date.now(); moved=false; dragEndAt=0;
+    if(id!==null){ abort(); return; }
+    const b=o.start(e); if(!b) return;
+    id=e.pointerId; x0=e.clientX; y0=e.clientY; t0=Date.now(); axis=null; el=b;
   });
-  zone.addEventListener("pointermove",e=>{
-    if(x0===null) return;
+  target.addEventListener("pointermove",e=>{
+    if(e.pointerId!==id) return;
     const dx=e.clientX-x0, dy=e.clientY-y0;
-    if(axis===null){                      // ось выбираем один раз, чтобы не мешать вертикальной прокрутке
+    if(axis===null){                     // ось выбираем один раз, чтобы не мешать вертикальной прокрутке
       if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
       axis = Math.abs(dx)>Math.abs(dy) ? "x" : "y";
+      if(axis==="x"){ clearTimeout(springT); if(o.grab) o.grab(el); }
     }
     if(axis!=="x") return;
-    moved=true;
-    const b=body(); b.classList.remove("day-in");
-    // туже тянется только там, где идти действительно некуда
-    const edge = (dx>0 && !canStep(-1)) || (dx<0 && !canStep(1));
-    b.style.transition="";
-    // делим на масштаб: внутри zoom'а px растянуты, иначе список обгонял бы палец
-    b.style.transform=`translateX(${dx*(edge?0.18:0.45)/uiScale}px)`;   // у края недели тянется туже
-    b.style.opacity=String(Math.max(.5, 1-Math.abs(dx)/420));
+    const tight=o.edge(dx<0?1:-1);       // туже тянется только там, где идти действительно некуда
+    el.style.transition="";
+    // делим на масштаб: внутри zoom'а px растянуты, иначе содержимое обгоняло бы палец
+    el.style.transform=`translateX(${dx*(tight?0.18:0.45)/uiScale}px)`;
+    el.style.opacity=String(Math.max(.5, 1-Math.abs(dx)/420));
   });
-  const end=e=>{
-    if(x0===null) return;
-    const dx=(e.clientX!==undefined?e.clientX:x0)-x0, dt=Date.now()-t0, wasX=(axis==="x");
-    x0=null; axis=null;
-    if(moved) dragEndAt=Date.now();
-    if(!wasX){ if(moved) release(true); return; }
+  target.addEventListener("pointerup",e=>{
+    if(e.pointerId!==id) return;
+    const dx=e.clientX-x0, dt=Date.now()-t0, wasX=(axis==="x"), b=stop();
+    if(!wasX) return;
+    const dir=dx<0?1:-1;
     const enough = Math.abs(dx)>70 || (Math.abs(dx)>30 && dt<300);   // длинный либо быстрый смах
-    if(enough && stepDay(dx<0?1:-1)){ release(false); haptic(); renderTT(); }
-    else release(true);
-  };
-  zone.addEventListener("pointerup",end);
-  zone.addEventListener("pointercancel",end);
+    if(enough && !o.edge(dir)){ settle(b,false); haptic(); o.commit(dir); }
+    else settle(b,true);
+  });
+  target.addEventListener("pointercancel",e=>{ if(e.pointerId===id) abort(); });
+  // passive:false обязателен — без него браузер молча игнорирует preventDefault
+  target.addEventListener("touchmove",e=>{
+    if(id!==null && axis==="x" && e.cancelable) e.preventDefault();
+  },{passive:false});
   // клик, прилетевший сразу за перетаскиванием, гасим — иначе сработает кнопка под пальцем.
   // Ограничение по времени: залежавшийся флаг не должен съесть обычный тап позже.
-  zone.addEventListener("click",e=>{
+  target.addEventListener("click",e=>{
     if(dragEndAt && Date.now()-dragEndAt<400){ dragEndAt=0; e.stopPropagation(); e.preventDefault(); }
   },true);
-})();
+}
 
-/* Свайп между вкладками. На расписании жест уже занят переключением дней,
-   поэтому там страницу не листаем: иначе два жеста дерутся на одном экране.
-   Обработчик висит на окне, но события с расписания отсеиваются по id. */
+/* Расписание: влево — следующий день, вправо — предыдущий. Там, где дней дальше
+   нет, жест уходит вкладкам: иначе на расписание можно было въехать свайпом,
+   а выехать нельзя — у края недели оно только пружинило. */
+const ttNeighbour = dir => NAV_ORDER[NAV_ORDER.indexOf("tt")+dir];
+bindSwipe($("s-tt"), {
+  start: ()=> isWide() ? null : $("ttBody"),    // на десктопе видна вся неделя, листать нечего
+  grab: b=>b.classList.remove("day-in"),
+  edge: dir=> !canStep(dir) && !ttNeighbour(dir),
+  commit: dir=>{ if(stepDay(dir)) renderTT(); else nav(ttNeighbour(dir)); }
+});
+
+/* Свайп между вкладками. Расписание здесь пропускаем: у него свой обработчик
+   выше, и он сам отдаёт жест вкладкам у края недели — иначе два жеста дрались
+   бы на одном экране. Обработчик висит на окне, расписание отсеивается по id. */
 (function(){
-  let x0=null, y0=null, axis=null, t0=0, moved=false, dragEndAt=0, box=null;
   const curId=()=>{ const el=document.querySelector(".screen.active"); return el?el.id.slice(2):null; };
   const idx=()=>{ const id=curId(); return NAV_ORDER.indexOf(id==="qr"?"scan":id); };
   // на десктопе вкладки переключают мышью по боковому меню, а случайное
@@ -1241,51 +1271,11 @@ $("ttToday").onclick=()=>{ttWk=0;ttSel=todayIndex();ttDirHint=0;haptic();renderT
     }
     return false;
   };
-  const release=spring=>{
-    if(!box) return;
-    const b=box; box=null;
-    b.style.transition = spring ? "transform .28s cubic-bezier(.3,1.2,.5,1), opacity .2s ease" : "";
-    b.style.transform=""; b.style.opacity="";
-    if(spring) setTimeout(()=>{ b.style.transition=""; },300);
-  };
-  addEventListener("pointerdown",e=>{
-    if(e.pointerType==="mouse" && e.button!==0) return;
-    if(!usable() || inScroller(e.target)) return;
-    x0=e.clientX; y0=e.clientY; axis=null; t0=Date.now(); moved=false;
-    box=$("s-"+curId());
+  bindSwipe(window, {
+    start: e=> (!usable() || inScroller(e.target)) ? null : $("s-"+curId()),
+    edge: dir=>{ const i=idx(), n=i+dir; return i<0 || n<0 || n>=NAV_ORDER.length; },
+    commit: dir=> nav(NAV_ORDER[idx()+dir])
   });
-  addEventListener("pointermove",e=>{
-    if(x0===null || !box) return;
-    const dx=e.clientX-x0, dy=e.clientY-y0;
-    if(axis===null){                       // ось выбираем один раз, чтобы не мешать прокрутке
-      if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
-      axis = Math.abs(dx)>Math.abs(dy) ? "x" : "y";
-    }
-    if(axis!=="x") return;
-    moved=true;
-    const i=idx();
-    const edge = (dx>0 && i<=0) || (dx<0 && i>=NAV_ORDER.length-1);
-    box.style.transition="";
-    box.style.transform=`translateX(${dx*(edge?0.18:0.45)/uiScale}px)`;   // у края списка тянется туже
-    box.style.opacity=String(Math.max(.5, 1-Math.abs(dx)/420));
-  });
-  const end=e=>{
-    if(x0===null) return;
-    const dx=(e.clientX!==undefined?e.clientX:x0)-x0, dt=Date.now()-t0, wasX=(axis==="x");
-    x0=null; axis=null;
-    if(moved) dragEndAt=Date.now();
-    if(!wasX){ if(moved) release(true); return; }
-    const i=idx(), next=i+(dx<0?1:-1);
-    const enough = Math.abs(dx)>70 || (Math.abs(dx)>30 && dt<300);   // длинный либо быстрый смах
-    if(enough && i>=0 && next>=0 && next<NAV_ORDER.length){ release(false); haptic(); nav(NAV_ORDER[next]); }
-    else release(true);
-  };
-  addEventListener("pointerup",end);
-  addEventListener("pointercancel",end);
-  // клик, прилетевший сразу за перетаскиванием, гасим — иначе сработает кнопка под пальцем
-  addEventListener("click",e=>{
-    if(dragEndAt && Date.now()-dragEndAt<400){ dragEndAt=0; e.stopPropagation(); e.preventDefault(); }
-  },true);
 })();
 
 

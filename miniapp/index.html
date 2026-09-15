@@ -430,21 +430,39 @@
   .side-me, .side-foot { display: none; }
   .tt-whd { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--gap); }
   .tt-whd .t { font-size: 17px; font-weight: 700; }
-  .tt-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); }
-  .tt-grid .col { min-width: 0; }
-  .tt-grid .hd { display: flex; align-items: baseline; gap: 6px; padding: 0 0 8px 2px;
-    border-bottom: .5px solid var(--line); margin-bottom: 8px; }
-  .tt-grid .hd .dw { font-size: 11.5px; color: var(--muted); }
-  .tt-grid .hd .dn { font-size: 15px; font-weight: 700; }
-  .tt-grid .col.today .hd .dn { color: var(--accent); }
-  .tt-grid .ls { display: flex; flex-direction: column; gap: 8px; }
-  .tt-grid .gl { position: relative; overflow: hidden; background: var(--tint);
-    border-radius: var(--r-md); padding: 9px 10px 9px 14px; }
-  .tt-grid .gl::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
-  .tt-grid .gl .tm { font-size: 11.5px; color: var(--accent); font-variant-numeric: tabular-nums; }
-  .tt-grid .gl .sj { font-size: 13px; font-weight: 700; color: var(--accent-d); margin: 3px 0 2px; }
-  .tt-grid .gl .mt { font-size: 11px; color: var(--accent); }
-  .tt-grid .none { font-size: 11.5px; color: var(--muted); padding: 6px 2px; }
+  /* Сетка времени: часы по левому краю, дни колонками, пара стоит на своём
+     месте и высотой показывает длительность. Так видно «окна» между парами,
+     чего стопка карточек не показывала вовсе. */
+  .tg { --hour-h: 58px; --tg-gutter: 54px;
+    background: var(--card); border-radius: var(--r-lg); padding: 14px 14px 18px; }
+  .tg-hd { display: grid; grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr));
+    align-items: center; padding-bottom: 10px; border-bottom: .5px solid var(--line); }
+  .tg-day { text-align: center; font-size: 12px; color: var(--muted); }
+  .tg-day b { display: inline-flex; align-items: center; justify-content: center;
+    min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
+    font-size: 14px; font-weight: 700; color: var(--text); }
+  .tg-day.today b { background: var(--accent); color: #fff; }
+  .tg-body { position: relative; display: grid;
+    grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr)); }
+  .tg-hours { position: relative; }
+  .tg-hours span { position: absolute; right: 10px; transform: translateY(-50%);
+    font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* часовые линии рисуем фоном — так они не плодят элементы */
+  .tg-col { position: relative; border-left: .5px solid var(--line);
+    background-image: repeating-linear-gradient(to bottom,
+      var(--line) 0, var(--line) .5px, transparent .5px, transparent var(--hour-h)); }
+  .tg-ev { position: absolute; overflow: hidden; background: var(--tint);
+    border-radius: var(--r-md); padding: 5px 7px 5px 10px; }
+  .tg-ev::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+  .tg-ev .sj { font-size: 12px; font-weight: 700; color: var(--accent-d); line-height: 1.2; }
+  .tg-ev .tm { font-size: 10.5px; color: var(--accent); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tg-ev .mt { font-size: 10.5px; color: var(--accent); opacity: .8; margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* линия текущего момента — только на текущей неделе */
+  .tg-now { position: absolute; left: var(--tg-gutter); right: 0; height: 0;
+    border-top: 1px dashed var(--bad); pointer-events: none; z-index: 3; }
+  .tg-now::before { content: ""; position: absolute; left: -4px; top: -4px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 
   @media (min-width: 900px) {
     body { max-width: none; margin-inline: 0; padding-left: var(--side-w); }
@@ -489,9 +507,6 @@
     /* сетка недели: дни — карточки во всю доступную высоту, а не стопка
        плашек, прижатая к верху экрана */
     .tt { max-width: none; padding-left: 20px; padding-right: 20px; }
-    .tt-grid { min-height: calc(100dvh / var(--ui) - 170px); align-content: stretch; }
-    .tt-grid .col { background: var(--card); border-radius: var(--r-lg); padding: 12px 10px; }
-    .tt-grid .hd { padding-left: 4px; }
   }
 
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
@@ -948,20 +963,56 @@ function renderTTGrid(){
   else if(ttWk===1){ btn.style.display=""; btn.textContent="This week"; }
   else btn.style.display="none";
   const TYPE={lec:"Lecture",prac:"Practice",lab:"Lab",sem:"Seminar"};
-  $("ttGrid").innerHTML = DOW.map((nm,i)=>{
-    const dd=D[i], list=W[i]||[];
-    const cells = list.length ? list.map(e=>{
-      const [st,en]=e.t.split("–");
-      const who = profile.kind==="class" ? (e.tc||"") : (e.c||"");
-      const meta=[TYPE[e.x]||"", e.r||"", who].filter(Boolean).map(esc).join(" · ");
-      return `<div class="gl"><div class="tm">${esc(st)}–${esc(en)}</div>`
-           + `<div class="sj">${esc(clean(e.s))}</div>`
-           + `<div class="mt">${meta}</div></div>`;
-    }).join("") : `<div class="none">—</div>`;
-    return `<div class="col${dd.toDateString()===todayStr?" today":""}">`
-         + `<div class="hd"><span class="dw">${nm}</span><span class="dn">${dd.getDate()}</span></div>`
-         + `<div class="ls">${cells}</div></div>`;
+
+  // границы сетки берём из самих пар: рисовать пустые часы незачем
+  let lo=Infinity, hi=-Infinity;
+  for(let i=0;i<6;i++) (W[i]||[]).forEach(e=>{ const [a,b]=e.t.split("–");
+    lo=Math.min(lo,mins(a)); hi=Math.max(hi,mins(b)); });
+  if(!isFinite(lo)){ lo=8*60; hi=18*60; }
+  const from=Math.floor(lo/60)*60, to=Math.ceil(hi/60)*60;
+  const HH=58, H=(to-from)/60*HH, y=m=>(m-from)/60*HH;
+  const hLabel=h=>((h%12)||12)+(h<12?" AM":" PM");
+
+  let hours="";
+  for(let h=from/60; h<=to/60; h++) hours+=`<span style="top:${y(h*60)}px">${hLabel(h)}</span>`;
+
+  const cols=[...Array(6)].map((_,i)=>{
+    const list=(W[i]||[]).map(e=>{ const [a,b]=e.t.split("–");
+      return { e, s:mins(a), t:mins(b), a, b }; }).sort((p,q)=>p.s-q.s||p.t-q.t);
+    /* Одновременные пары (подгруппы) ставим рядом, а не друг на друга. Ширину
+       делим внутри группы пересекающихся: иначе одна накладка сузила бы весь день. */
+    const clusters=[]; let cl=[], end=-1;
+    list.forEach(it=>{ if(cl.length && it.s>=end){ clusters.push(cl); cl=[]; end=-1; }
+      cl.push(it); end=Math.max(end,it.t); });
+    if(cl.length) clusters.push(cl);
+    clusters.forEach(group=>{ const ends=[];
+      group.forEach(it=>{ let k=ends.findIndex(x=>x<=it.s); if(k<0) k=ends.length; ends[k]=it.t; it.lane=k; });
+      group.forEach(it=>it.total=ends.length); });
+
+    return `<div class="tg-col">` + list.map(it=>{
+      const w=100/it.total, L=it.lane*w;
+      const meta=[TYPE[it.e.x]||"", it.e.r||""].filter(Boolean).map(esc).join(" · ");
+      const h=Math.max(28, y(it.t)-y(it.s)-3);
+      return `<div class="tg-ev" style="top:${y(it.s)}px;height:${h}px;`
+           + `left:calc(${L}% + 3px);width:calc(${w}% - 6px)">`
+           + `<div class="sj">${esc(shortSubj(clean(it.e.s),22))}</div>`
+           + `<div class="tm">${esc(it.a)}</div>`
+           + (meta?`<div class="mt">${meta}</div>`:"")
+           + `</div>`;
+    }).join("") + `</div>`;
   }).join("");
+
+  // линия текущего момента: только текущая неделя и только в пределах сетки
+  let now="";
+  if(ttWk===0){
+    const n=new Date(), nm=n.getHours()*60+n.getMinutes(), di=(n.getDay()+6)%7;
+    if(di<6 && nm>=from && nm<=to) now=`<div class="tg-now" style="top:${y(nm)}px"></div>`;
+  }
+
+  $("ttGrid").innerHTML = `<div class="tg"><div class="tg-hd"><span></span>`
+    + DOW.map((nm,i)=>`<span class="tg-day${D[i].toDateString()===todayStr?" today":""}">${nm}<b>${D[i].getDate()}</b></span>`).join("")
+    + `</div><div class="tg-body" style="height:${H}px">`
+    + `<div class="tg-hours">${hours}</div>${cols}${now}</div></div>`;
 }
 $("ttWideBtn").onclick=()=>{ ttWk = ttWk?0:1; if(!ttWk) ttSel=todayIndex(); haptic(); renderTT(); };
 // смена ширины окна на лету: пересобираем открытое расписание

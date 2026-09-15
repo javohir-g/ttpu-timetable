@@ -36,8 +36,16 @@
     --field-b: #D9D9DE;
     /* цветовая индикация оценок */
     --ok: #34C759; --warn: #FF9500; --bad: #FF3B30;
-    /* подложки под цвет типа занятия — подбираются под тему, как --tint */
-    --tint-ok: #E8F7ED; --tint-warn: #FFF2E2;
+    /* Палитра предметов: цвет выбирается по названию, поэтому один предмет
+       всегда одного цвета — и в разные дни, и в разные недели. */
+    --sb1:#E9F2FD; --sf1:#1D63B8;
+    --sb2:#E8F7ED; --sf2:#186B33;
+    --sb3:#FFF2E2; --sf3:#8A5A00;
+    --sb4:#F0ECFD; --sf4:#5B3FBE;
+    --sb5:#E4F5F4; --sf5:#16736D;
+    --sb6:#FDEBF1; --sf6:#A83968;
+    --sb7:#F3F1DD; --sf7:#6E5F10;
+    --sb8:#ECEEF3; --sf8:#4E5769;
     /* Эталон — экран расписания: поля страницы 12, зазор между карточками 10,
        карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
     --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
@@ -65,7 +73,14 @@
       --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
       --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
       --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
-      --tint-ok: #16301F; --tint-warn: #33250F;
+      --sb1:#1B2A3D; --sf1:#7DB6F8;
+      --sb2:#16301F; --sf2:#45D67B;
+      --sb3:#33250F; --sf3:#FFB13D;
+      --sb4:#251F3D; --sf4:#A98CFF;
+      --sb5:#123030; --sf5:#4FD4CB;
+      --sb6:#351B27; --sf6:#FF8FB3;
+      --sb7:#2C2A14; --sf7:#D6C64A;
+      --sb8:#24282F; --sf8:#AAB4C4;
     }
   }
   :root[data-theme="dark"] {
@@ -73,7 +88,14 @@
     --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
     --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
     --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
-    --tint-ok: #16301F; --tint-warn: #33250F;
+    --sb1:#1B2A3D; --sf1:#7DB6F8;
+    --sb2:#16301F; --sf2:#45D67B;
+    --sb3:#33250F; --sf3:#FFB13D;
+    --sb4:#251F3D; --sf4:#A98CFF;
+    --sb5:#123030; --sf5:#4FD4CB;
+    --sb6:#351B27; --sf6:#FF8FB3;
+    --sb7:#2C2A14; --sf7:#D6C64A;
+    --sb8:#24282F; --sf8:#AAB4C4;
   }
   /* смена темы не должна выглядеть как перезагрузка страницы */
   body, .card, .nav, .lesson, .mini, .field input, .seg {
@@ -469,19 +491,22 @@
      цвет несёт сама подложка, как в образце. */
   .tg-ev { position: absolute; overflow: hidden; background: var(--tint);
     border-radius: var(--r-md); padding: 6px 8px; }
-  .tg-ev .top { display: flex; align-items: baseline; gap: 6px; }
-  .tg-ev .sj { flex: 1; min-width: 0; font-size: 12px; font-weight: 700;
-    color: var(--accent-d); line-height: 1.25; }
-  .tg-ev .tm { flex: none; font-size: 10.5px; color: var(--accent); font-variant-numeric: tabular-nums; }
-  .tg-ev .mt { font-size: 10.5px; color: var(--accent); opacity: .8; margin-top: 3px;
+  /* время не пишем: оно уже стоит слева на своей строке */
+  .tg-ev .sj { font-size: 12px; font-weight: 700; line-height: 1.25; color: var(--accent-d); }
+  .tg-ev .mt { font-size: 10.5px; color: var(--accent); opacity: .85; margin-top: 3px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Цвет по типу занятия: та же многоцветность, что в образце, но осмысленная.
-     Подложки — токены под обе темы: полупрозрачная rgba поверх тёмной карточки
-     давала мутный оттенок и плохо читаемый текст. */
-  .tg-ev.t-prac { background: var(--tint-ok); }
-  .tg-ev.t-prac .sj, .tg-ev.t-prac .tm, .tg-ev.t-prac .mt { color: var(--ok); }
-  .tg-ev.t-lab { background: var(--tint-warn); }
-  .tg-ev.t-lab .sj, .tg-ev.t-lab .tm, .tg-ev.t-lab .mt { color: var(--warn); }
+  .tg-ev .tc { font-size: 10.5px; color: var(--accent); opacity: .7; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Цвет по предмету. Подложки — непрозрачные токены под обе темы:
+     полупрозрачная rgba поверх тёмной карточки давала мутный оттенок. */
+  .tg-ev.s1 { background: var(--sb1); } .tg-ev.s1 .sj, .tg-ev.s1 .mt, .tg-ev.s1 .tc { color: var(--sf1); }
+  .tg-ev.s2 { background: var(--sb2); } .tg-ev.s2 .sj, .tg-ev.s2 .mt, .tg-ev.s2 .tc { color: var(--sf2); }
+  .tg-ev.s3 { background: var(--sb3); } .tg-ev.s3 .sj, .tg-ev.s3 .mt, .tg-ev.s3 .tc { color: var(--sf3); }
+  .tg-ev.s4 { background: var(--sb4); } .tg-ev.s4 .sj, .tg-ev.s4 .mt, .tg-ev.s4 .tc { color: var(--sf4); }
+  .tg-ev.s5 { background: var(--sb5); } .tg-ev.s5 .sj, .tg-ev.s5 .mt, .tg-ev.s5 .tc { color: var(--sf5); }
+  .tg-ev.s6 { background: var(--sb6); } .tg-ev.s6 .sj, .tg-ev.s6 .mt, .tg-ev.s6 .tc { color: var(--sf6); }
+  .tg-ev.s7 { background: var(--sb7); } .tg-ev.s7 .sj, .tg-ev.s7 .mt, .tg-ev.s7 .tc { color: var(--sf7); }
+  .tg-ev.s8 { background: var(--sb8); } .tg-ev.s8 .sj, .tg-ev.s8 .mt, .tg-ev.s8 .tc { color: var(--sf8); }
   /* линия текущего момента — только на текущей неделе */
   .tg-now { position: absolute; left: var(--tg-gutter); right: 0; height: 0;
     border-top: 1px dashed var(--bad); pointer-events: none; z-index: 3; }
@@ -1006,6 +1031,14 @@ function renderTTGrid(){
   slots.forEach((s,idx)=>{ hours+=`<span class="sl" style="top:${rowTop(idx)+8}px">`
     + `<b>${esc(s.a)}</b><i>${esc(s.b)}</i></span>`; });
 
+  /* Цвет пары — по предмету. Палитра раздаётся по алфавитному порядку предметов
+     недели, а не хешем от названия: хеш на восьми ячейках почти всегда давал
+     совпадения, и два разных предмета получали один цвет — ровно то, что цвет
+     и должен различать. Порядок общий на всю неделю, поэтому предмет не меняет
+     цвет ото дня ко дню. Предметов в неделю бывает до восьми — столько цветов и есть. */
+  const subjOrder=[...new Set([].concat(...W.slice(0,6).map(d=>(d||[]).map(e=>clean(e.s)))))].sort();
+  const toneOf=s=>" s"+(Math.max(0,subjOrder.indexOf(s))%8+1);
+
   const cols=[...Array(6)].map((_,i)=>{
     const list=(W[i]||[]).map(e=>{ const [a,b]=e.t.split("–");
       return { e, s:mins(a), t:mins(b), a, b }; }).sort((p,q)=>p.s-q.s||p.t-q.t);
@@ -1026,12 +1059,13 @@ function renderTTGrid(){
       let a=slots.findIndex(s=>s.p===it.e.p);
       if(a<0) a=Math.max(0, slots.findIndex(s=>s.s>=it.s));
       let b=a; while(b+1<slots.length && slots[b+1].t<=it.t) b++;
-      const tone = it.e.x==="prac" ? " t-prac" : (it.e.x==="lab" ? " t-lab" : "");
+      const who = profile.kind==="class" ? (it.e.tc||"") : (it.e.c||"");
+      const tone = toneOf(clean(it.e.s));
       return `<div class="tg-ev${tone}" style="top:${rowTop(a)+2}px;height:${(b-a+1)*HH-6}px;`
            + `left:calc(${L}% + 3px);width:calc(${w}% - 6px)">`
-           + `<div class="top"><span class="sj">${esc(clean(it.e.s))}</span>`
-           + `<span class="tm">${esc(it.a)}–${esc(it.b)}</span></div>`
+           + `<div class="sj">${esc(clean(it.e.s))}</div>`
            + (meta?`<div class="mt">${meta}</div>`:"")
+           + (who?`<div class="tc">${esc(who)}</div>`:"")
            + `</div>`;
     }).join("") + `</div>`;
   }).join("");

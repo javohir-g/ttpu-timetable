@@ -562,8 +562,14 @@ function toast(m){ try{ if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2")) 
 function seedOf(s){ return [...String(s||"")].reduce((a,c)=>a+c.charCodeAt(0),0); }
 function initials(name){ const p=(name||"").replace(/[^A-Za-z0-9 .-]/g," ").trim().split(/[ .-]+/).filter(Boolean);
   return (((p[0]||"")[0]||"")+((p[1]||"")[0]||""))||(name||"?")[0]; }
-function displayName(){ if(TGU&&(TGU.first_name||TGU.last_name)) return [TGU.first_name,TGU.last_name].filter(Boolean).join(" ");
-  return (profile && (profile.who || profile.name)) || "—"; }
+/* Имя и фамилию берём из edu.turin.uz: это учебная запись, а в Telegram у
+   человека может стоять что угодно. Аккаунт Telegram — только запасной
+   вариант, если Moodle имя не отдал. */
+function displayName(){
+  if(profile && profile.who) return profile.who;
+  if(TGU&&(TGU.first_name||TGU.last_name)) return [TGU.first_name,TGU.last_name].filter(Boolean).join(" ");
+  return (profile && profile.name) || "—";
+}
 
 /* ---------- storage ---------- */
 const hasCloud = tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9");
@@ -1050,6 +1056,9 @@ async function refreshGrades(quiet){
   if(!quiet) setGrStatus("Loading…");
   try{
     const g=await lmsLoadGrades();
+    // Имя приходит в том же ответе Moodle. Подхватываем его здесь: при входе
+    // запрос имени необязателен и мог не пройти, а ещё в Moodle его могли сменить.
+    if(g.user && profile && profile.who!==g.user){ profile.who=g.user; saveProfile(profile); }
     lmsSaveGrades(g); paintGrades(g);   // статус выставит сама paintGrades
   }catch(e){
     if(e.code==="invalidtoken" || e.code==="accessexception"){

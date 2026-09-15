@@ -404,6 +404,15 @@
     color: var(--muted); padding: 5px 0 5px 12px; }
   .gr-items .it b { color: var(--text2); font-weight: 600; flex: none; }
 
+  /* ================= ПОЛОСА ПОД ВЫРЕЗОМ ЭКРАНА ================= */
+  /* padding у body резервирует место под статус-бар только до первой прокрутки:
+     он часть документа и уезжает вместе с ним, после чего контент рисуется под
+     часами, вырезом и кнопками Telegram. Липкая шапка расписания это переживает,
+     а экраны без неё — нет. Поэтому полосу закрываем неподвижной плашкой.
+     z-index: выше контента и липкой шапки (5), ниже меню (30) и плашки офлайна (40). */
+  .safe-cap { position: fixed; top: 0; left: 0; right: 0; height: var(--safe-top);
+    background: var(--bg); z-index: 20; pointer-events: none; }
+
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>
 <script>
@@ -604,6 +613,9 @@
   </div>
 </div>
 
+<!-- полоса под статус-баром в полноэкранном режиме; вне его высота равна нулю -->
+<div class="safe-cap"></div>
+
 <!-- ================= OFFLINE ================= -->
 <div class="offline" id="offlineBar" aria-live="polite">
   <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3 21 21"/><path d="M9 16.8a4.5 4.5 0 0 1 6 0"/><path d="M5.5 13.3a9 9 0 0 1 3.3-2.1"/><path d="M15.4 11.3a9 9 0 0 1 3.1 2"/><path d="M2 9.6a14 14 0 0 1 4.6-2.9"/><path d="M11.4 5.6A14 14 0 0 1 22 9.6"/><path d="M12 20.2h.01"/></svg></span>
@@ -755,6 +767,9 @@ function days(){ const pool=profile.kind==="class"?DATA.classes:DATA.teachers;
 const SCREENS=["home","tt","scan","qr","att","profile"];
 function nav(to){
   if(to==="scan"&&profile.kind==="teacher") to="qr";
+  // Экран входа не входит в SCREENS и сам не снимется: без этого он остаётся
+  // поверх любой страницы, если showLogin() отработал вне обычного сценария.
+  $("s-login").classList.remove("active");
   SCREENS.forEach(n=>$("s-"+n).classList.toggle("active",n===to));
   const navKey = to==="qr"?"scan":to;
   [...$("nav").children].forEach(b=>{

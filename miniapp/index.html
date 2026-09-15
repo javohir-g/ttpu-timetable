@@ -213,6 +213,12 @@
   .empty .t { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
 
   .list { padding: 2px 16px; }
+  /* заголовок раздела внутри списка оценок */
+  .list .sec-hd { display: flex; align-items: baseline; gap: 8px; padding: 13px 0 6px;
+    border-bottom: .5px solid var(--line); }
+  .list .sec-hd:first-child { padding-top: 5px; }
+  .list .sec-hd .t { font-size: 12px; font-weight: 700; color: var(--text2); }
+  .list .sec-hd .c { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list .li { display: flex; justify-content: space-between; align-items: center; padding: 11px 0;
     border-bottom: .5px solid var(--line); font-size: 13.5px; }
   .list .li:last-child { border-bottom: none; }
@@ -1285,18 +1291,72 @@ async function refreshGrades(quiet){
     }
   } finally { grBusy=false; }
 }
+/* Год набора из названия группы: SE1-24 → 24, AD-23 → 23. */
+function admitYear(){
+  const m=String((profile&&profile.name)||"").match(/(\d{2})\s*$/);
+  return m ? +m[1] : null;
+}
+/* Раздел для курса. Номер выводим как «год из кода предмета − год набора + 1»:
+   при группе SE1-24 код [SE-24-I] даёт первый курс, [SE-25-II] — второй.
+   Это трактовка кода, а не факт, поэтому в заголовке рядом с номером
+   показываем сами коды — ошибка чтения будет видна, а не спрячется.
+   Двузначный год берём только отдельным числом, иначе «2024» дало бы «20». */
+function courseSection(rawName){
+  const m=String(rawName||"").match(/^\s*[\[(]([^)\]]*)[\])]/);
+  const code=m ? m[1].trim() : "";
+  if(!code) return { key:"", year:null, code:"" };
+  const y=code.match(/(?:^|[^\d])(\d{2})(?!\d)/), a=admitYear();
+  if(y && a!==null){
+    const n=(+y[1]) - a + 1;
+    if(n>=1 && n<=6) return { key:"y"+n, year:n, code };
+  }
+  return { key:code, year:null, code };   // код есть, но год не читается — группируем по коду
+}
+const ORD=["","1st","2nd","3rd","4th","5th","6th"];
+
 function paintGrades(g){
   // дата обновления переехала в строку статуса — отдельной шапки больше нет
   setGrStatus(g.updated ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
-  const rows=g.courses||[];
-  $("grList").innerHTML = rows.length
-    ? rows.map((c,i)=>{
-        const txt = c.grade==null ? "—" : String(c.grade);
-        return `<div class="li gr-row" data-i="${i}"><span class="k">${esc(prettySubject(c.name))}</span>`
-             + `<span class="v ${gradeClass(c.grade)}">${esc(txt)}</span></div>`
-             + `<div class="gr-items" data-items="${i}"></div>`;
-      }).join("")
-    : `<div class="li"><span class="muted">No courses</span></div>`;
+  const rows=(g.courses||[]).map((c,i)=>({ c, i, s:courseSection(c.name) }));
+  if(!rows.length){ $("grList").innerHTML=`<div class="li"><span class="muted">No courses</span></div>`; return; }
+
+  const order=[], byKey=new Map();
+  rows.forEach(r=>{ const k=r.s.key;
+    if(!byKey.has(k)){ byKey.set(k,[]); order.push(k); }
+    byKey.get(k).push(r); });
+  // один раздел — заголовок ни о чём не сообщает, показываем плоский список
+  const grouped = byKey.size>1;
+  // курсы по возрастанию номера, затем разделы по коду в порядке Moodle, без кода — в конец
+  order.sort((a,b)=>{
+    const ra=byKey.get(a)[0].s, rb=byKey.get(b)[0].s;
+    if(ra.year && rb.year) return ra.year-rb.year;
+    if(ra.year) return -1;
+    if(rb.year) return 1;
+    if(!a) return 1;
+    if(!b) return -1;
+    return 0;
+  });
+
+  const row=r=>{
+    const txt = r.c.grade==null ? "—" : String(r.c.grade);
+    return `<div class="li gr-row" data-i="${r.i}"><span class="k">${esc(prettySubject(r.c.name))}</span>`
+         + `<span class="v ${gradeClass(r.c.grade)}">${esc(txt)}</span></div>`
+         + `<div class="gr-items" data-items="${r.i}"></div>`;
+  };
+  let html="";
+  order.forEach(k=>{
+    const list=byKey.get(k);
+    if(grouped){
+      const s=list[0].s;
+      const codes=[...new Set(list.map(r=>r.s.code).filter(Boolean))].join(", ");
+      const title = s.year ? ORD[s.year]+" year" : (s.code || "Other");
+      html += `<div class="sec-hd"><span class="t">${esc(title)}</span>`
+            + (s.year && codes ? `<span class="c">${esc(codes)}</span>` : "")
+            + `</div>`;
+    }
+    html += list.map(row).join("");
+  });
+  $("grList").innerHTML = html;
   [...$("grList").querySelectorAll(".gr-row")].forEach(r=>{
     r.onclick=()=>toggleCourse(+r.dataset.i);
   });

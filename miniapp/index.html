@@ -95,6 +95,8 @@
   .btn { display: block; width: 100%; border: none; background: var(--accent); color: #fff;
     font-size: 15px; font-weight: 600; padding: 13px; border-radius: var(--r-md); cursor: pointer; }
   .btn.ghost { background: var(--tint); color: var(--accent); }
+  /* выход — действие с последствиями, поэтому отделён цветом, а не спрятан */
+  .btn.danger { background: rgba(255,59,48,.12); color: var(--bad); margin-top: var(--gap); }
 
   /* ================= LOGIN ================= */
   /* dvh меряется в реальных пикселях экрана, а блок рисуется уже увеличенным — делим на масштаб */
@@ -109,17 +111,6 @@
     font-size: 16px; padding: 12px 40px 12px 12px; border-radius: var(--r-md); outline: none; }
   .field input::placeholder { color: var(--muted); }
   .field input:focus { border-color: var(--accent); }
-  .field .seg-mini { position: absolute; right: 6px; top: 6px; bottom: 6px; display: flex; gap: 3px; }
-  .seg-mini button { border: none; background: transparent; color: var(--muted); font-size: 11px;
-    font-weight: 700; padding: 0 8px; border-radius: 7px; cursor: pointer; }
-  .seg-mini button.sel { background: var(--accent); color: #fff; }
-  .suggest { max-height: 168px; overflow-y: auto; margin: -6px 0 12px; border-radius: var(--r-md);
-    background: var(--field); border: 1px solid var(--field-b); display: none; }
-  .suggest.on { display: block; }
-  .suggest button { display: block; width: 100%; text-align: left; border: none; background: none;
-    color: var(--text); font-size: 14px; padding: 10px 12px; cursor: pointer; border-bottom: .5px solid var(--line); }
-  .suggest button:last-child { border-bottom: none; }
-  .suggest button:active { background: var(--tint); }
 
   /* ================= HOME ================= */
   .hbar { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad-x) 6px; }
@@ -273,9 +264,6 @@
   .prof-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: var(--gap); }
   .prof-card .pava { width: 54px; height: 54px; border-radius: var(--r-md); background: var(--tint); color: var(--accent); }
   .prof-card .nm { flex: 1; font-size: 16px; font-weight: 700; }
-  .prof-card .edit { width: 34px; height: 34px; border: none; background: none; color: var(--muted); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; }
-  .prof-card .edit svg { width: 18px; height: 18px; }
   /* раньше это была последняя карточка экрана, теперь под ней настройки — нужен общий зазор */
   #profList { margin-bottom: var(--gap); }
   .demo-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
@@ -423,9 +411,6 @@
   /* ================= ОБЩИЙ ВХОД ================= */
   #lgLms h1 { margin-bottom: 8px; }
   .lg-note { font-size: 11.5px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
-  .lg-skip { display: block; width: 100%; margin-top: 10px; border: none; background: none;
-    color: var(--accent); font-size: 13px; font-weight: 600; padding: 6px; cursor: pointer; }
-  .lg-who { font-size: 12px; color: var(--muted); text-align: center; margin: -10px 0 14px; }
   .gr-prompt { padding: 16px; margin-bottom: var(--gap); text-align: center; }
   .gr-prompt h2 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
   .gr-prompt p { font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
@@ -471,7 +456,7 @@
   <div class="login-wrap">
     <div class="card login-card">
 
-      <!-- шаг 1: общий вход в LMS -->
+      <!-- Единственный экран входа. Группу не спрашиваем — она приходит из Moodle. -->
       <div id="lgLms">
         <h1>Sign in</h1>
         <p class="lg-note">Your edu.turin.uz account. The password is sent straight to the university, used once to get an access token, and never saved.</p>
@@ -479,20 +464,6 @@
         <div class="field"><input id="lgPass" type="password" placeholder="Password" autocomplete="current-password"></div>
         <button class="btn" id="lgBtn">Sign in</button>
         <div class="gr-err" id="lgErr"></div>
-        <button class="lg-skip" id="lgSkip">Skip — just the timetable</button>
-      </div>
-
-      <!-- шаг 2: группа. Сюда ведёт «Пропустить», смена группы и случай,
-           когда группу не удалось определить по профилю автоматически. -->
-      <div id="lgGroup" style="display:none">
-        <h1>Welcome!</h1>
-        <div class="lg-who" id="lgWho"></div>
-        <div class="field">
-          <input id="loginQ" type="text" placeholder="Group" autocomplete="off">
-          <div class="seg-mini"><button id="segS" class="sel">Student</button><button id="segT">Teacher</button></div>
-        </div>
-        <div class="suggest" id="loginList"></div>
-        <button class="btn" id="loginBtn">Login</button>
       </div>
 
     </div>
@@ -607,7 +578,6 @@
     <div class="card prof-card">
       <div class="pava" id="profAva"></div>
       <div class="nm" id="profName">–</div>
-      <button class="edit" id="changeBtn" aria-label="Change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
     </div>
     <div class="card list" id="profList"></div>
     <div class="card set-card">
@@ -626,11 +596,8 @@
         <button id="uiUp" aria-label="Larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       </div>
     </div>
-    <!-- отвязать аккаунт LMS: раньше кнопка жила в шапке оценок -->
-    <div class="card set-card" id="lmsRow" style="display:none">
-      <span class="k">edu.turin.uz</span>
-      <button class="gr-out" id="grOut" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 17 5-5-5-5"/><path d="M20 12H9"/><path d="M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg></button>
-    </div>
+    <!-- полный выход: стирает вход в LMS и группу, возвращает на экран входа -->
+    <button class="btn danger" id="logoutBtn">Log out</button>
     <div class="lock-wrap">
       <div class="locked"><div class="card list">
         <div class="li"><span class="k">Notifications</span><span class="v">On</span></div>
@@ -680,7 +647,7 @@ const DOWS = ["M","T","W","T","F","S"];
 const MONS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const CHART_LBL = ["MON","TUE","WED","THU","FRI","SUN"];
 
-let DATA=null, profile=null, pickKind="class", selDay=0, scanMode="qr";
+let DATA=null, profile=null, selDay=0, scanMode="qr";
 const $ = id => document.getElementById(id);
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
 const mins = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
@@ -716,10 +683,12 @@ function weekDates(){ const n=new Date(),s=new Date(n),wd=(n.getDay()+6)%7;
 function todayIndex(){ const wd=(new Date().getDay()+6)%7; return wd===6?0:wd; }
 function haptic(){ if(tg&&tg.HapticFeedback) try{tg.HapticFeedback.selectionChanged();}catch(e){} }
 function toast(m){ try{ if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2")) return tg.showAlert(m); }catch(e){} alert(m); }
-function seedOf(s){ return [...s].reduce((a,c)=>a+c.charCodeAt(0),0); }
+// String(): группы может не быть — Moodle её не дал, а null развернуть нельзя
+function seedOf(s){ return [...String(s||"")].reduce((a,c)=>a+c.charCodeAt(0),0); }
 function initials(name){ const p=(name||"").replace(/[^A-Za-z0-9 .-]/g," ").trim().split(/[ .-]+/).filter(Boolean);
   return (((p[0]||"")[0]||"")+((p[1]||"")[0]||""))||(name||"?")[0]; }
-function displayName(){ if(TGU&&(TGU.first_name||TGU.last_name)) return [TGU.first_name,TGU.last_name].filter(Boolean).join(" "); return profile.name; }
+function displayName(){ if(TGU&&(TGU.first_name||TGU.last_name)) return [TGU.first_name,TGU.last_name].filter(Boolean).join(" ");
+  return (profile && (profile.who || profile.name)) || "—"; }
 
 /* ---------- storage ---------- */
 const hasCloud = tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9");
@@ -860,7 +829,7 @@ document.querySelectorAll("#nav lord-icon").forEach(ic=>ic.addEventListener("rea
 /* ---------- HOME ---------- */
 function attVals(){ const s=seedOf(profile.name); return CHART_LBL.map((_,i)=>Math.min(100,40+((s*(i*7+5))%60))); }
 function renderHome(){
-  $("homeAva").textContent = TGU ? "" : initials(profile.name).toUpperCase();
+  $("homeAva").textContent = TGU ? "" : initials(displayName()).toUpperCase();
   $("homeName").innerHTML = esc(displayName()).replace(" ","<br>");
   $("homeRole").textContent = profile.kind==="class" ? "Student" : "Teacher";
   const D=days(), ti=todayIndex(), today=D[ti]||[];
@@ -900,6 +869,16 @@ function renderTT(){
   });
   movePill(first);
   const day = days()[ttSel]||[];
+  // Группу не спрашиваем, поэтому её отсутствие надо объяснить прямо здесь,
+  // показав, что именно вернул Moodle — иначе экран выглядит просто пустым.
+  if(!profile.name){
+    const found=(profile.groupNames||[]).join(", ");
+    $("ttBody").innerHTML=`<div class="empty"><div class="t">Group unknown</div>`
+      + `Moodle did not return a group matching the timetable.`
+      + (found ? `<br>It returned: ${esc(found)}` : "")
+      + `</div>`;
+    animateDay(dir); return;
+  }
   if(!day.length){ $("ttBody").innerHTML=`<div class="empty"><div class="t">No classes</div>Enjoy your free day</div>`; animateDay(dir); return; }
   let h="";
   day.forEach((e,i)=>{
@@ -1300,26 +1279,18 @@ $("lgBtn").onclick=async ()=>{
     $("lgPass").value="";          // пароль больше не нужен — стираем сразу же
     lmsSaveToken(t); haptic();
     const who=await lmsWhoAmI();
-    if(who.group){                 // группу определили — второй шаг не нужен
-      profile={kind:"class",name:who.group}; saveProfile(profile);
-      if(tg) try{tg.BackButton.hide();}catch(e){}
-      enterApp();
-    } else {
-      // Показываем, что именно вернул Moodle: молчаливое «выберите группу»
-      // не даёт понять, почему автоопределение не сработало.
-      const found=(who.groupNames||[]).filter(Boolean).slice(0,3).join(", ");
-      $("lgWho").textContent = (who.name ? "Signed in as "+who.name+". " : "")
-        + (found ? "Moodle groups: "+found+" — none match the timetable, pick yours."
-                 : "Moodle has no group for you — pick yours.");
-      showLogin("group");
-    }
+    // Группу не спрашиваем ни при каких условиях. Если Moodle её не дал —
+    // входим без неё: оценки работают, а расписание само объяснит, чего нет.
+    profile={ kind:"class", name:who.group||null, who:who.name||"",
+              groupNames:(who.groupNames||[]).filter(Boolean).slice(0,4) };
+    saveProfile(profile);
+    if(tg) try{tg.BackButton.hide();}catch(e){}
+    enterApp();
   }catch(e){ $("lgErr").textContent=e.message||"Sign-in failed"; }
   finally{ $("lgBtn").disabled=false; $("lgBtn").textContent="Sign in"; }
 };
 $("lgPass").onkeydown=e=>{ if(e.key==="Enter") $("lgBtn").click(); };
-$("lgSkip").onclick=()=>{ haptic(); showLogin("group"); };
-$("grSignIn").onclick=()=>{ haptic(); showLogin("lms"); };
-$("grOut").onclick=()=>{ lmsSaveToken(""); lmsSaveGrades(null); haptic(); setGrErr(""); setGrStatus(""); renderGrades(); };
+$("grSignIn").onclick=()=>{ haptic(); showLogin(); };
 
 /* ---------- ATTENDANCE ---------- */
 /* На экране остались только оценки: выдуманная посещаемость убрана вместе
@@ -1331,53 +1302,38 @@ function renderProfile(){
   $("profAva").textContent=initials(displayName()).toUpperCase();
   $("profName").textContent=displayName();
   const rows=[
-    [profile.kind==="class"?"Group":"Teacher", profile.name],
+    [profile.kind==="class"?"Group":"Teacher", profile.name || "—"],
     ["Tg user", TGU&&TGU.username ? "@"+TGU.username : "—"],
   ];
   $("profList").innerHTML = rows.map(([k,v])=>`<div class="li"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
-  $("lmsRow").style.display = lmsToken ? "" : "none";   // отвязать можно, только если привязан
   renderThemeSeg();
   $("profUpdated").textContent="Timetable: "+(DATA.week||"")+" · updated "+DATA.updated;
 }
-$("changeBtn").onclick=()=>{haptic();showLogin();};
 
 /* ---------- LOGIN ---------- */
-/* Экран входа состоит из двух шагов. Шаг LMS показываем только тому, кто ещё
-   не входил и не выбирал группу; «сменить группу» и повторный заход ведут
-   сразу ко второму шагу, чтобы не требовать пароль лишний раз. */
-function showLogin(step){
+/* Экран один: логин и пароль. Группу приложение не спрашивает — она приходит
+   из Moodle, поэтому ни выбора группы, ни обхода входа здесь больше нет. */
+function showLogin(){
   SCREENS.forEach(n=>$("s-"+n).classList.remove("active"));
   $("nav").classList.remove("on"); $("s-login").classList.add("active");
-  const wantLms = step==="lms" || (step!=="group" && !lmsToken && !profile);
-  $("lgLms").style.display   = wantLms ? "" : "none";
-  $("lgGroup").style.display = wantLms ? "none" : "";
   $("lgErr").textContent="";
-  // уходим с шага входа — поле пароля не должно оставаться заполненным
-  if(!wantLms) $("lgPass").value="";
-  $("loginQ").value=""; renderSuggest();
+  $("lgPass").value="";
   if(tg&&profile){ try{tg.BackButton.show();tg.BackButton.onClick(()=>{tg.BackButton.hide();enterApp();});}catch(e){} }
 }
-function pool(){ return pickKind==="class"?DATA.classes:DATA.teachers; }
-function renderSuggest(){
-  const q=$("loginQ").value.trim().toLowerCase();
-  const items=pool().filter(e=>e.name.toLowerCase().includes(q)).slice(0,30);
-  $("loginList").classList.toggle("on", q.length>0 && items.length>0);
-  $("loginList").innerHTML=items.map(e=>`<button>${esc(e.name)}</button>`).join("");
-  [...$("loginList").children].forEach((b,i)=>b.onclick=()=>{ $("loginQ").value=items[i].name; $("loginList").classList.remove("on"); });
+/* Полный выход. Облачную копию профиля стираем обязательно: иначе он
+   вернётся из CloudStorage при следующем запуске и выход окажется мнимым. */
+function logout(){
+  haptic();
+  lmsSaveToken(""); lmsSaveGrades(null);
+  profile=null;
+  try{ localStorage.removeItem("ttpu_profile"); }catch(e){}
+  if(hasCloud) try{ tg.CloudStorage.removeItems(["profile"],()=>{}); }catch(e){}
+  setGrErr(""); setGrStatus("");
+  $("lgUser").value=""; $("lgPass").value="";
+  if(tg) try{ tg.BackButton.hide(); }catch(e){}
+  showLogin();
 }
-function segPick(k){ pickKind=k; $("segS").classList.toggle("sel",k==="class"); $("segT").classList.toggle("sel",k==="teacher");
-  $("loginQ").placeholder=k==="class"?"Group":"Teacher"; renderSuggest(); }
-$("segS").onclick=()=>segPick("class"); $("segT").onclick=()=>segPick("teacher");
-$("loginQ").oninput=renderSuggest;
-$("loginQ").onkeydown=e=>{ if(e.key==="Enter") $("loginBtn").click(); };
-$("loginBtn").onclick=()=>{
-  const q=$("loginQ").value.trim().toLowerCase();
-  const hit=pool().find(e=>e.name.toLowerCase()===q)||pool().find(e=>e.name.toLowerCase().includes(q)&&q);
-  if(!hit){ toast(pickKind==="class"?"Enter your group, e.g. SE1-24":"Enter your last name"); return; }
-  profile={kind:pickKind,name:hit.name}; saveProfile(profile); haptic();
-  if(tg)try{tg.BackButton.hide();}catch(e){}
-  enterApp();
-};
+$("logoutBtn").onclick=logout;
 
 /* ---------- boot ---------- */
 function enterApp(){ $("s-login").classList.remove("active"); $("nav").classList.add("on"); ttSel=todayIndex(); nav("home"); }

@@ -40,6 +40,9 @@
        карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
     --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
     --pad-x: 12px; --gap: 10px; --pad-b: 100px;
+    /* Ширина приложения. На мониторе колонка держится по центру: макет
+       нарисован под телефон, и растягивать его на всю ширину незачем. */
+    --app-w: 480px;
     /* Масштаб интерфейса: body целиком растягивается через zoom, поэтому все размеры
        в px едут пропорционально и переписывать их по одному не нужно. */
     --ui: 1;
@@ -86,6 +89,7 @@
   body {
     background: var(--bg); color: var(--text);
     zoom: var(--ui);
+    max-width: var(--app-w); margin-inline: auto;
     /* в полноэкранном режиме контент начинается под статус-баром — отступаем на его высоту */
     padding-top: var(--safe-top);
     font: 15px/1.4 "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
@@ -246,7 +250,10 @@
      заметно высоко. Берём наибольшее — на телефоне с полосой меню встаёт вровень
      с ней, без неё остаётся 14px. Первая строка — запасная: браузер без max()
      её и возьмёт, вместо того чтобы остаться вовсе без bottom. */
-  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x);
+  /* меню закреплено за окном, поэтому ограничиваем и центрируем его отдельно —
+     иначе на мониторе оно растянулось бы во всю ширину экрана */
+  .nav { position: fixed; left: 50%; right: auto; transform: translateX(-50%);
+    width: calc(100% - var(--pad-x) * 2); max-width: calc(var(--app-w) - var(--pad-x) * 2);
     bottom: 14px; bottom: max(14px, var(--safe-bot));
     z-index: 30; display: none; align-items: center; justify-content: space-between;
     padding: 9px 22px; border-radius: 20px;
@@ -304,7 +311,7 @@
   .offline { position: fixed; left: 50%; z-index: 40;
     bottom: 92px; bottom: calc(78px + max(14px, var(--safe-bot)));
     display: flex; align-items: center; gap: 7px;
-    max-width: calc(100% - var(--pad-x) * 4);
+    max-width: min(calc(100% - var(--pad-x) * 4), calc(var(--app-w) - var(--pad-x) * 4));
     padding: 8px 14px; border-radius: 100px;
     background: rgba(var(--card-rgb), .82);
     backdrop-filter: blur(22px) saturate(180%);
@@ -402,6 +409,17 @@
   .res .v.g-ok { color: var(--accent); }
   .res .v.g-mid { color: var(--warn); }
   .res .v.g-low { color: var(--bad); }
+
+  /* ================= ДЕСКТОП ================= */
+  /* Только там, где указатель настоящий: на тач-экранах :hover залипает
+     после тапа и строка остаётся подсвеченной. */
+  @media (hover: hover) and (pointer: fine) {
+    .gr-row:hover, .due:hover { background: var(--tint); }
+    .week .d:not(.sel):hover { background: var(--tint); }
+    .nav button:not(.active):hover { color: var(--accent); }
+    .profile-card:hover, .sec-h:hover { background: var(--tint); }
+    .suggest button:hover { background: var(--tint); }
+  }
 
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>

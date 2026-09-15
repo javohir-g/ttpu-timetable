@@ -425,6 +425,9 @@
   /* ================= ДЕСКТОП ================= */
   /* Всё ниже точки перелома не применяется: телефонный вид не меняется. */
   .tt-wide { display: none; }
+  /* блоки боковой колонки: на телефоне меню — горизонтальная плашка, и лишние
+     дети в ней всё бы сломали, поэтому по умолчанию их нет */
+  .side-me, .side-foot { display: none; }
   .tt-whd { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--gap); }
   .tt-whd .t { font-size: 17px; font-weight: 700; }
   .tt-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); }
@@ -464,11 +467,31 @@
     /* главная — панель: сроки и результаты встают рядом, а не стопкой */
     #s-home .pad { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap);
       align-items: start; max-width: 940px; margin-inline: auto; }
-    #homeProfile, #homeSchedCard { grid-column: 1 / -1; }
     /* расписание: вместо одного дня с листанием — вся неделя */
     .tt { max-width: 1120px; margin-inline: auto; padding-top: 10px; }
     .tt-sticky, #ttBody { display: none; }
     .tt-wide { display: block; }
+
+    /* Колонка меню была на 210px четырьмя кнопками и 579px пустоты. Отдаём
+       верх личному блоку, низ — подписи о данных, меню посередине. */
+    .side-me { display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px; }
+    .side-me .pava { width: 38px; height: 38px; border-radius: var(--r-md); font-size: 14px; }
+    .side-me .who { min-width: 0; }
+    .side-me .nm { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .side-me .gr { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .side-foot { display: block; margin-top: auto; padding: 10px 10px 2px;
+      font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+    /* имя и группа теперь в колонке — карточка на главной дублировала бы их */
+    #homeProfile { display: none; }
+    /* мини-карточки расписания не должны растягиваться под 288px ради «14:20 / DSS» */
+    #s-home .minis .mini { flex: 0 1 190px; min-width: 0; }
+
+    /* сетка недели: дни — карточки во всю доступную высоту, а не стопка
+       плашек, прижатая к верху экрана */
+    .tt { max-width: none; padding-left: 20px; padding-right: 20px; }
+    .tt-grid { min-height: calc(100dvh / var(--ui) - 170px); align-content: stretch; }
+    .tt-grid .col { background: var(--card); border-radius: var(--r-lg); padding: 12px 10px; }
+    .tt-grid .hd { padding-left: 4px; }
   }
 
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
@@ -539,6 +562,13 @@
     <div class="card sec" id="homeSchedCard">
       <div class="sec-h" id="homeSeeAll"><h2>Schedule</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
       <div class="sec-b"><div class="minis" id="homeSchedule"></div></div>
+    </div>
+    <!-- без входа в LMS на главной нечего показывать: приглашение и полезнее
+         пустоты, и занимает вторую колонку панели на десктопе -->
+    <div class="card gr-prompt" id="homeLmsCard" style="display:none">
+      <h2>Deadlines and grades</h2>
+      <p>Sign in with your edu.turin.uz account to see what is due, how work was graded, and your latest results.</p>
+      <button class="btn" id="homeLmsBtn">Sign in</button>
     </div>
     <!-- обе карточки видны только после входа в LMS -->
     <div class="card sec" id="homeDueCard" style="display:none">
@@ -637,10 +667,16 @@
 
 <!-- ================= NAV ================= -->
 <nav class="nav" id="nav">
+  <!-- личный блок и подпись видны только в боковой колонке на десктопе -->
+  <div class="side-me" id="sideMe">
+    <div class="pava" id="sideAva"></div>
+    <div class="who"><div class="nm" id="sideName">–</div><div class="gr" id="sideGroup">–</div></div>
+  </div>
   <button data-nav="home" aria-label="Home"><lord-icon src="icons/home-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
   <button data-nav="tt" aria-label="Timetable"><lord-icon src="icons/calendar-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
   <button data-nav="att" aria-label="Grades"><lord-icon src="icons/bar-chart-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
   <button data-nav="profile" aria-label="Profile"><lord-icon src="icons/info-circle-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
+  <div class="side-foot" id="sideFoot"></div>
 </nav>
 
 <script>
@@ -810,6 +846,16 @@ function nav(to){
   const dir = navPrev===null ? 1 : (Math.sign(i-navPrev) || 1);
   navPrev=i;
   if(to!=="tt") animateScreen(to,dir);   // у расписания своя анимация смены дня
+  renderSide();                          // личный блок боковой колонки держим свежим
+}
+/* Боковая колонка на десктопе. На телефоне эти элементы скрыты, но заполнять
+   их всё равно безвредно — так не нужно гадать, какая сейчас ширина. */
+function renderSide(){
+  if(!profile) return;
+  $("sideAva").textContent = initials(displayName()).toUpperCase();
+  $("sideName").textContent = displayName();
+  $("sideGroup").textContent = profile.name || "—";
+  $("sideFoot").textContent = (DATA && DATA.week) ? DATA.week : "";
 }
 [...document.querySelectorAll("#nav button")].forEach(b=>b.onclick=()=>{haptic();nav(b.dataset.nav);});
 // анимацию запускаем через playerInstance — у самого элемента <lord-icon> метода play нет
@@ -862,9 +908,12 @@ function renderHome(){
   $("homeSchedule").innerHTML = today.length ? today.map(e=>`
     <div class="mini" title="${esc(clean(e.s))}"><div class="t">${e.t.split("–")[0]}</div><div class="s">${esc(shortSubj(clean(e.s)))}</div><div class="r">${esc(e.r||"—")}</div></div>`).join("")
     : `<div class="mini none">No classes today</div>`;
+  // вошёл — вторую колонку занимают сроки и результаты, не вошёл — приглашение
+  $("homeLmsCard").style.display = lmsToken ? "none" : "";
   renderHomeFeed();
 }
 $("homeSeeAll").onclick=()=>{haptic();nav("tt");};
+$("homeLmsBtn").onclick=()=>{haptic();showLogin();};
 $("homeProfile").onclick=()=>{haptic();nav("profile");};
 $("homeDueMore").onclick=()=>{haptic();nav("att");};
 $("homeResMore").onclick=()=>{haptic();nav("att");};

@@ -9,7 +9,6 @@
 <meta name="theme-color" content="#F2F2F7">
 <title>TTPU Student</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">
 <script src="https://cdn.lordicon.com/lordicon.js"></script>
 <style>
@@ -60,7 +59,7 @@
     --ok: #30D158; --warn: #FF9F0A; --bad: #FF453A;
   }
   /* смена темы не должна выглядеть как перезагрузка страницы */
-  body, .card, .nav, .lesson, .mini, .field input, .seg, .lock-badge .ic {
+  body, .card, .nav, .lesson, .mini, .field input, .seg {
     transition: background-color .25s ease, color .25s ease, border-color .25s ease; }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
@@ -139,15 +138,6 @@
   .mini .r { font-size: 12px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mini.none { background: var(--bg); color: var(--muted); font-size: 13px; padding: 20px 8px; flex-basis: 100%; }
 
-  .chart-wrap { display: flex; gap: 10px; }
-  .yaxis { display: flex; flex-direction: column; justify-content: space-between; height: 130px;
-    font-size: 9.5px; color: var(--muted); text-align: right; padding-bottom: 18px; width: 18px; }
-  .chart { flex: 1; display: flex; align-items: flex-end; gap: 10px; height: 130px; }
-  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-  .chart .bar { width: 100%; max-width: 30px; border-radius: 4px 4px 0 0; background: var(--tint2); }
-  .chart .col.hi .bar { background: var(--accent); }
-  .chart .lbl { font-size: 9.5px; color: var(--muted); }
-
   /* ================= TIMETABLE (1:1 with Figma) ================= */
   /* pan-y: вертикальную прокрутку отдаём браузеру, горизонталь обрабатываем сами (свайп по дням) */
   #s-tt { touch-action: pan-y; }
@@ -205,40 +195,6 @@
   .empty { text-align: center; color: var(--muted); padding: 70px 24px 80px; }
   .empty .t { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
 
-  /* ================= SCAN / CODE ================= */
-  .scan-screen { min-height: calc(100dvh / var(--ui) - var(--safe-top) - 80px); display: flex; flex-direction: column; align-items: center; }
-  .scan-body { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 var(--pad-x); }
-  .reticle { width: 190px; height: 190px; position: relative; }
-  .reticle i { position: absolute; width: 46px; height: 46px; border: 5px solid var(--accent); }
-  .reticle i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
-  .reticle i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
-  .reticle i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
-  .reticle i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
-  .reticle .ok { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-  .reticle .ok svg { width: 62px; height: 62px; color: var(--accent); }
-  .code-box { width: 100%; text-align: center; }
-  .code-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
-  .cells { display: flex; justify-content: center; gap: 8px; }
-  .cells input { width: 40px; height: 40px; border: 1.5px solid var(--field-b); border-radius: var(--r-sm);
-    background: var(--field); color: var(--text); text-align: center; font-size: 17px; font-weight: 600; outline: none; }
-  .cells input:focus { border-color: var(--accent); }
-  .mode { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; }
-  .mode button { width: 34px; height: 34px; border: none; border-radius: var(--r-sm); background: var(--card);
-    color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .mode button svg { width: 18px; height: 18px; }
-  .mode button.sel { background: var(--accent); color: #fff; }
-  .mode button.txt { font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
-
-  /* ================= QR DISPLAY (teacher) ================= */
-  .qr-card { margin: 60px var(--pad-x) 0; padding: 26px 20px 20px; text-align: center; }
-  .qr-card .code { font-size: 26px; font-weight: 500; letter-spacing: .32em; margin-bottom: 16px; padding-left: .32em; }
-  .qr-card #qr { display: flex; justify-content: center; }
-  .qr-card #qr img, .qr-card #qr canvas { width: 240px !important; height: 240px !important; }
-  .qr-card .bar { height: 5px; border-radius: 4px; background: var(--tint2); margin-top: 18px; overflow: hidden; }
-  .qr-card .bar i { display: block; height: 100%; background: var(--accent); width: 100%;
-    transform-origin: left; animation: shrink 60s linear infinite; }
-  @keyframes shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-
   .list { padding: 2px 16px; }
   .list .li { display: flex; justify-content: space-between; align-items: center; padding: 11px 0;
     border-bottom: .5px solid var(--line); font-size: 13.5px; }
@@ -286,36 +242,11 @@
   .nav button[data-nav="tt"] lord-icon { width: 29px; height: 29px; }
   .nav button[data-nav="profile"] lord-icon { width: 29px; height: 29px; }
   .nav button.active { color: var(--accent); }
-  .nav .fab, .nav .fab.active { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); color: #fff; padding: 0;
-    transition: transform .25s cubic-bezier(.34,1.45,.5,1); will-change: transform; }
-  .nav .fab:active { transform: scale(.84); transition-duration: .1s; }
-  .nav .fab lord-icon { width: 32px; height: 32px; }
   /* Цвет иконок задаём CSS-переменными Lordicon: они наследуются в shadow DOM, работают
      надёжнее атрибута colors (он у части файлов не применяется) и сами следуют теме.
      --icon-bold — «жирность»: у System-иконок фигуры залиты, поэтому обводим их тем же цветом (BOLD_CSS). */
   .nav button lord-icon { --lord-icon-primary: var(--text2); --lord-icon-secondary: var(--text2); --icon-bold: 0; }
   .nav button.active lord-icon { --lord-icon-primary: var(--accent); --lord-icon-secondary: var(--accent); }
-  .nav .fab lord-icon, .nav .fab.active lord-icon { --lord-icon-primary: #fff; --lord-icon-secondary: #fff; }
-  .nav .fab.active lord-icon { --icon-bold: 8; }
-  /* ================= ЗАГЛУШКИ ================= */
-  /* Разделы без реальной логики: содержимое размывается и перестаёт ловить нажатия,
-     поверх — значок замка. Так видно, что блок задуман, но ещё не работает. */
-  .lock-wrap { position: relative; }
-  .locked { filter: blur(7px) saturate(.5); opacity: .5; pointer-events: none; user-select: none; }
-  .locked.fill { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; }
-  .lock-badge { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 7px; text-align: center; padding: 0 16px; }
-  /* у экранов с .pad снизу 100px под меню — иначе замок уезжает выше центра */
-  .pad.lock-wrap > .lock-badge { bottom: var(--pad-b); }
-  .lock-badge .ic { width: 38px; height: 38px; border-radius: 50%; background: var(--card);
-    border: .5px solid var(--line); color: var(--muted); display: flex; align-items: center; justify-content: center; }
-  .lock-badge .ic svg { width: 19px; height: 19px; }
-  .lock-badge .t { font-size: 14px; font-weight: 600; color: var(--text2); }
-  .lock-badge .s { font-size: 12px; color: var(--muted); margin-top: -3px; }
-  .lock-badge.sm { gap: 5px; }
-  .lock-badge.sm .ic { width: 30px; height: 30px; }
-  .lock-badge.sm .ic svg { width: 15px; height: 15px; }
-  .lock-badge.sm .t { font-size: 12.5px; }
 
   /* ================= НАСТРОЙКИ ================= */
   .set-card { display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -476,15 +407,6 @@
       <div class="sec-h" id="homeSeeAll"><h2>Schedule</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
       <div class="sec-b"><div class="minis" id="homeSchedule"></div></div>
     </div>
-    <div class="card sec">
-      <div class="sec-h" id="homeAtt"><h2>Attendance</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-      <div class="sec-b lock-wrap">
-        <div class="locked"><div class="chart-wrap">
-          <div class="yaxis"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
-          <div class="chart" id="homeChart"></div></div></div>
-        <div class="lock-badge sm" data-title="Coming soon"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -499,42 +421,6 @@
     <div class="card week" id="ttWeek"><span class="wk-pill" id="ttPill"></span></div>
     </div>
     <div class="card tl-card" id="ttBody"></div>
-  </div>
-</div>
-
-<!-- ================= SCAN (student) ================= -->
-<div id="s-scan" class="screen">
-  <div class="scan-screen lock-wrap">
-    <div class="locked fill">
-    <div class="scan-body">
-      <div id="scanQR" class="reticle"><i></i><i></i><i></i><i></i>
-        <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg></div>
-      </div>
-      <div id="scanCode" class="code-box" style="display:none">
-        <h2>Enter confirmation code</h2>
-        <div class="cells" id="cells"></div>
-      </div>
-    </div>
-    <div class="mode">
-      <button class="txt" id="modeT">T</button>
-      <button class="sel" id="modeQ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01"/></svg></button>
-    </div>
-    </div>
-    <div class="lock-badge" data-title="Coming soon" data-sub="Check-in needs a server"></div>
-  </div>
-</div>
-
-<!-- ================= QR DISPLAY (teacher) ================= -->
-<div id="s-qr" class="screen">
-  <div class="lock-wrap">
-    <div class="locked">
-      <div class="card qr-card">
-        <div class="code" id="qrCode">ABCDE</div>
-        <div id="qr"></div>
-        <div class="bar"><i></i></div>
-      </div>
-    </div>
-    <div class="lock-badge" data-title="Coming soon" data-sub="Check-in needs a server"></div>
   </div>
 </div>
 
@@ -588,14 +474,6 @@
     </div>
     <!-- полный выход: стирает вход в LMS и группу, возвращает на экран входа -->
     <button class="btn danger" id="logoutBtn">Log out</button>
-    <div class="lock-wrap">
-      <div class="locked"><div class="card list">
-        <div class="li"><span class="k">Notifications</span><span class="v">On</span></div>
-        <div class="li"><span class="k">Phone number</span><span class="v">+998 90 000 00 00</span></div>
-        <div class="li"><span class="k">Language</span><span class="v">English</span></div>
-      </div></div>
-      <div class="lock-badge sm" data-title="Coming soon"></div>
-    </div>
     <div class="demo-note" id="profUpdated"></div>
   </div>
 </div>
@@ -613,7 +491,6 @@
 <nav class="nav" id="nav">
   <button data-nav="home" aria-label="Home"><lord-icon src="icons/home-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
   <button data-nav="tt" aria-label="Timetable"><lord-icon src="icons/calendar-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
-  <button data-nav="scan" class="fab" aria-label="Check in"><lord-icon src="icons/qr-code.json" stroke="bold"></lord-icon></button>
   <button data-nav="att" aria-label="Attendance"><lord-icon src="icons/bar-chart-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
   <button data-nav="profile" aria-label="Profile"><lord-icon src="icons/info-circle-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
 </nav>
@@ -635,9 +512,7 @@ const TGU = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
 const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const DOWS = ["M","T","W","T","F","S"];
 const MONS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const CHART_LBL = ["MON","TUE","WED","THU","FRI","SUN"];
-
-let DATA=null, profile=null, selDay=0, scanMode="qr";
+let DATA=null, profile=null, selDay=0;
 const $ = id => document.getElementById(id);
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
 const mins = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
@@ -743,19 +618,12 @@ function uiStep(d){ const i=UI_STEPS.indexOf(uiScale)+d;
 $("uiDown").onclick=()=>uiStep(-1);
 $("uiUp").onclick=()=>uiStep(1);
 
-/* Замок на неработающих блоках: svg рисуем в одном месте, чтобы не плодить копии в разметке. */
-const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="3"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>';
-document.querySelectorAll(".lock-badge").forEach(b=>{
-  b.innerHTML=`<span class="ic">${LOCK_SVG}</span><span class="t">${b.dataset.title||"Coming soon"}</span>`
-    + (b.dataset.sub?`<span class="s">${b.dataset.sub}</span>`:"");
-});
 function days(){ const pool=profile.kind==="class"?DATA.classes:DATA.teachers;
   const e=pool.find(x=>x.name===profile.name); return e?e.days:[[],[],[],[],[],[]]; }
 
 /* ---------- nav ---------- */
-const SCREENS=["home","tt","scan","qr","att","profile"];
+const SCREENS=["home","tt","att","profile"];
 function nav(to){
-  if(to==="scan"&&profile.kind==="teacher") to="qr";
   // Экран входа не входит в SCREENS и сам не снимется: без этого он остаётся
   // поверх любой страницы, если showLogin() отработал вне обычного сценария.
   $("s-login").classList.remove("active");
@@ -768,7 +636,7 @@ function nav(to){
     if(on) requestAnimationFrame(()=>playIcon(ic));
   });
   window.scrollTo(0,0);
-  ({home:renderHome, tt:renderTT, scan:renderScan, qr:renderQR, att:renderAtt, profile:renderProfile})[to]();
+  ({home:renderHome, tt:renderTT, att:renderAtt, profile:renderProfile})[to]();
   const i=NAV_ORDER.indexOf(navKey);
   const dir = navPrev===null ? 1 : (Math.sign(i-navPrev) || 1);
   navPrev=i;
@@ -817,7 +685,6 @@ document.querySelectorAll("#nav lord-icon").forEach(ic=>ic.addEventListener("rea
 }));
 
 /* ---------- HOME ---------- */
-function attVals(){ const s=seedOf(profile.name); return CHART_LBL.map((_,i)=>Math.min(100,40+((s*(i*7+5))%60))); }
 function renderHome(){
   $("homeAva").textContent = TGU ? "" : initials(displayName()).toUpperCase();
   $("homeName").innerHTML = esc(displayName()).replace(" ","<br>");
@@ -826,11 +693,8 @@ function renderHome(){
   $("homeSchedule").innerHTML = today.length ? today.map(e=>`
     <div class="mini" title="${esc(clean(e.s))}"><div class="t">${e.t.split("–")[0]}</div><div class="s">${esc(shortSubj(clean(e.s)))}</div><div class="r">${esc(e.r||"—")}</div></div>`).join("")
     : `<div class="mini none">No classes today</div>`;
-  const vals=attVals(), hi=Math.min(ti,5);
-  $("homeChart").innerHTML = CHART_LBL.map((n,i)=>`<div class="col ${i===hi?'hi':''}"><div class="bar" style="height:${vals[i]}%"></div><div class="lbl">${n}</div></div>`).join("");
 }
 $("homeSeeAll").onclick=()=>{haptic();nav("tt");};
-$("homeAtt").onclick=()=>{haptic();nav("att");};
 $("homeProfile").onclick=()=>{haptic();nav("profile");};
 
 /* ---------- TIMETABLE ---------- */
@@ -906,11 +770,11 @@ function animateDay(dir){
 }
 /* Та же анимация при смене вкладки. Анимируем карточки внутри .pad (или содержимое
    экрана, если .pad нет), направление — из порядка вкладок в нижнем меню. */
-const NAV_ORDER = ["home","tt","scan","att","profile"];
+const NAV_ORDER = ["home","tt","att","profile"];
 let navPrev = null;
 function animateScreen(id, dir){
   const scr=$("s-"+id); if(!scr) return;
-  const box=scr.querySelector(".pad")||scr.querySelector(".scan-screen")||scr;
+  const box=scr.querySelector(".pad")||scr;
   scr.style.setProperty("--dx", (dir<0 ? -22 : 22)+"px");
   [...box.children].forEach((el,i)=>el.style.setProperty("--i", Math.min(i,8)));
   box.classList.remove("anim-in");
@@ -1035,35 +899,6 @@ $("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
   },true);
 })();
 
-/* ---------- SCAN (student) ---------- */
-function renderScan(){ setScanMode(scanMode); }
-function setScanMode(m){ scanMode=m;
-  $("scanQR").style.display = m==="qr"?"":"none";
-  $("scanCode").style.display = m==="qr"?"none":"";
-  $("modeQ").classList.toggle("sel",m==="qr"); $("modeT").classList.toggle("sel",m!=="qr");
-  if(m!=="qr"&&!$("cells").children.length){
-    $("cells").innerHTML=[...Array(6)].map(()=>`<input inputmode="numeric" maxlength="1">`).join("");
-    const cs=[...$("cells").children];
-    cs.forEach((c,i)=>{ c.oninput=()=>{ c.value=c.value.replace(/\D/g,"").slice(-1);
-        if(c.value&&i<5) cs[i+1].focus();
-        if(cs.every(x=>x.value)){ toast("Code "+cs.map(x=>x.value).join("")+" — demo: a backend is needed to confirm attendance."); cs.forEach(x=>x.value=""); cs[0].focus(); } };
-      c.onkeydown=ev=>{ if(ev.key==="Backspace"&&!c.value&&i>0) cs[i-1].focus(); }; });
-  }
-  if(m!=="qr") setTimeout(()=>$("cells").children[0].focus(),50);
-}
-$("modeT").onclick=()=>{haptic();setScanMode("text");};
-$("modeQ").onclick=()=>{haptic();setScanMode("qr");};
-$("scanQR").onclick=()=>{ if(tg&&tg.showScanQrPopup) try{ tg.showScanQrPopup({text:"Scan the class QR"},(t)=>{ tg.closeScanQrPopup(); toast("Scanned: "+t+" — demo, no backend yet."); return true; }); return; }catch(e){}
-  toast("Demo — QR scanning works inside Telegram; a backend is needed to record attendance."); };
-
-/* ---------- QR display (teacher) ---------- */
-let qrMade=false;
-function renderQR(){
-  const code=[...Array(5)].map((_,i)=>String.fromCharCode(65+((seedOf(profile.name)*(i+3)+new Date().getHours())%26))).join("");
-  $("qrCode").textContent=code;
-  $("qr").innerHTML="";
-  if(window.QRCode) try{ new QRCode($("qr"),{text:"ttpu-attendance:"+profile.name+":"+code,width:240,height:240,correctLevel:QRCode.CorrectLevel.M}); }catch(e){}
-}
 
 /* ---------- ОЦЕНКИ: Moodle на edu.turin.uz ---------- */
 /* Логин и пароль уходят с устройства прямо на сервер университета — там открыт CORS,

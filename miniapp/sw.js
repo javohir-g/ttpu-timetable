@@ -13,10 +13,10 @@
 
 /* Имя меняется при сбросе данных: обработчик activate удаляет все кеши,
    кроме текущего, поэтому старая офлайн-копия страницы и расписания уходит. */
-const CACHE = "ttpu-static-v2";
+const CACHE = "ttpu-static-v3";
 const SHELL = [
   "./", "index.html", "data.json",
-  "icons/home-morph.json", "icons/calendar-morph.json", "icons/qr-code.json",
+  "icons/home-morph.json", "icons/calendar-morph.json",
   "icons/bar-chart-morph.json", "icons/info-circle-morph.json"
 ];
 

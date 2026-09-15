@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TTPU Student</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">
+<script src="https://cdn.lordicon.com/lordicon.js"></script>
+<style>
+  :root {
+    --accent: #539DF3;
+    --accent-d: #3C86DE;
+    --tint: #E9F2FD;
+    --tint2: #BBD7F7;
+    --bg: #F2F2F7; --bg-rgb: 242, 242, 247;
+    --card: #FFFFFF; --card-rgb: 255, 255, 255;
+    --text: #000000;
+    --text2: #3C3C43;
+    --muted: #8E8E93;
+    --line: #E5E5EA;
+    --field: #FFFFFF;
+    --field-b: #D9D9DE;
+    /* Эталон — экран расписания: поля страницы 12, зазор между карточками 10,
+       карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
+    --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
+    --pad-x: 12px; --gap: 10px; --pad-b: 100px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #5DA2F5; --accent-d: #7DB6F8; --tint: #1B2A3D; --tint2: #24425F;
+      --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
+      --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  html, body { height: 100%; scrollbar-width: none; -ms-overflow-style: none; }
+  ::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.4 "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .pad { padding: 8px var(--pad-x) var(--pad-b); }
+  .muted { color: var(--muted); }
+  svg { display: block; }
+  button { font-family: inherit; }
+
+  .card { background: var(--card); border-radius: var(--r-lg); }
+  .btn { display: block; width: 100%; border: none; background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 600; padding: 13px; border-radius: var(--r-md); cursor: pointer; }
+  .btn.ghost { background: var(--tint); color: var(--accent); }
+
+  /* ================= LOGIN ================= */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; padding: 0 var(--pad-x); }
+  .login-card { width: 100%; padding: 22px 16px 20px; }
+  .login-card h1 { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 18px; }
+  .lbl { font-size: 11.5px; font-weight: 600; color: var(--text2); margin: 0 0 6px 2px; }
+  .field { position: relative; margin-bottom: 12px; }
+  .field input { width: 100%; border: 1px solid var(--field-b); background: var(--field); color: var(--text);
+    font-size: 14px; padding: 12px 40px 12px 12px; border-radius: var(--r-md); outline: none; }
+  .field input::placeholder { color: var(--muted); }
+  .field input:focus { border-color: var(--accent); }
+  .field .seg-mini { position: absolute; right: 6px; top: 6px; bottom: 6px; display: flex; gap: 3px; }
+  .seg-mini button { border: none; background: transparent; color: var(--muted); font-size: 11px;
+    font-weight: 700; padding: 0 8px; border-radius: 7px; cursor: pointer; }
+  .seg-mini button.sel { background: var(--accent); color: #fff; }
+  .suggest { max-height: 168px; overflow-y: auto; margin: -6px 0 12px; border-radius: var(--r-md);
+    background: var(--field); border: 1px solid var(--field-b); display: none; }
+  .suggest.on { display: block; }
+  .suggest button { display: block; width: 100%; text-align: left; border: none; background: none;
+    color: var(--text); font-size: 14px; padding: 10px 12px; cursor: pointer; border-bottom: .5px solid var(--line); }
+  .suggest button:last-child { border-bottom: none; }
+  .suggest button:active { background: var(--tint); }
+
+  /* ================= HOME ================= */
+  .hbar { display: flex; align-items: center; justify-content: space-between; padding: 14px var(--pad-x) 6px; }
+  .hicon { width: 40px; height: 40px; border: none; background: none; color: var(--text2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; }
+  .hicon svg { width: 24px; height: 24px; }
+  .hicon .dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); }
+
+  .profile-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    cursor: pointer; margin-bottom: var(--gap); }
+  .pava { width: 62px; height: 62px; border-radius: var(--r-md); flex: none; background: #D9D9DE;
+    color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
+  .pinfo { flex: 1; min-width: 0; }
+  .pname { font-size: 21px; font-weight: 700; letter-spacing: -.3px; line-height: 1.1; }
+  .prole { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .chev { width: 18px; height: 18px; color: var(--muted); flex: none; }
+
+  .sec { margin-bottom: var(--gap); overflow: hidden; }
+  .sec-h { display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px 10px; border-bottom: .5px solid var(--line); cursor: pointer; }
+  .sec-h h2 { font-size: 13px; font-weight: 500; color: var(--text2); }
+  .sec-b { padding: 12px 16px 14px; }
+
+  .minis { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+  .minis::-webkit-scrollbar { display: none; }
+  .mini { flex: 1 0 calc(33.333% - 7px); min-width: calc(33.333% - 7px); background: var(--tint);
+    border-radius: var(--r-md); padding: 14px 6px 12px; text-align: center; }
+  .mini .t { font-size: 12.5px; color: var(--accent); }
+  .mini .s { font-size: 14px; font-weight: 700; color: var(--accent-d); margin: 12px 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini .r { font-size: 12px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini.none { background: var(--bg); color: var(--muted); font-size: 13px; padding: 20px 8px; flex-basis: 100%; }
+
+  .chart-wrap { display: flex; gap: 10px; }
+  .yaxis { display: flex; flex-direction: column; justify-content: space-between; height: 130px;
+    font-size: 9.5px; color: var(--muted); text-align: right; padding-bottom: 18px; width: 18px; }
+  .chart { flex: 1; display: flex; align-items: flex-end; gap: 10px; height: 130px; }
+  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+  .chart .bar { width: 100%; max-width: 30px; border-radius: 4px 4px 0 0; background: var(--tint2); }
+  .chart .col.hi .bar { background: var(--accent); }
+  .chart .lbl { font-size: 9.5px; color: var(--muted); }
+
+  /* ================= TIMETABLE (1:1 with Figma) ================= */
+  /* pan-y: вертикальную прокрутку отдаём браузеру, горизонталь обрабатываем сами (свайп по дням) */
+  #s-tt { touch-action: pan-y; }
+  .tt { padding: 0 var(--pad-x) var(--pad-b); }
+  /* шапка расписания закрепляется при прокрутке: дата и строка дней остаются на экране.
+     Общая обёртка с фоном страницы — иначе в зазор между карточками просвечивал бы контент. */
+  .tt-sticky { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 var(--gap); }
+  .tt-card { display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 18px 22px; margin-bottom: 10px; }
+  .tt-card .dl { display: flex; align-items: center; }
+  .tt-card .big { font-size: 56px; font-weight: 800; letter-spacing: -1.8px; line-height: .9; }
+  .tt-card .sub { font-size: 15px; color: var(--muted); margin-left: 10px; line-height: 1.45; }
+  .today-pill { border: none; background: var(--tint); color: var(--accent); font-size: 14.5px;
+    font-weight: 400; padding: 9px 16px; border-radius: 100px; cursor: pointer; }
+  /* отступ 8px со всех сторон; радиус чипа = радиус карточки (20) − отступ (8) = 12 → углы концентричны */
+  .week { position: relative; display: flex; justify-content: space-between; padding: 8px; margin-bottom: 0; }
+  /* плашка выбранного дня — отдельный слой, который едет к нужной кнопке */
+  .wk-pill { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 12px;
+    background: var(--accent); pointer-events: none;
+    transition: transform .34s cubic-bezier(.32,1.25,.4,1), width .34s cubic-bezier(.32,1.25,.4,1); }
+  .week .d { position: relative; z-index: 1;
+    width: 42px; height: 50px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 4px; border-radius: 12px; cursor: pointer; background: transparent;
+    border: none; color: var(--text); }
+  .week .d .dw, .week .d .dn { transition: color .22s ease; }
+  .week .d .dw { font-size: 12px; color: var(--muted); line-height: 1; }
+  .week .d .dn { font-size: 15.5px; font-weight: 700; line-height: 1; }
+  .week .d.sel .dw, .week .d.sel .dn { color: #fff; }
+  .week .d.today:not(.sel) .dn { color: var(--accent); }
+
+  .tl-card { padding: 10px 10px 4px 0; overflow: hidden; }
+  /* Переход между днями (.day-in) и между вкладками (.anim-in): блоки въезжают
+     со стороны перехода, со ступенчатой задержкой по порядку. */
+  .tl-card.day-in > *, .anim-in > * { animation: dayIn .3s cubic-bezier(.22,.9,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 35ms); }
+  @keyframes dayIn { from { opacity: 0; transform: translateX(var(--dx, 22px)); } to { opacity: 1; transform: none; } }
+  .row { display: flex; }
+  .row .time { width: 72px; flex: none; text-align: right; padding: 2px 10px 0 0; }
+  .row .time .a { font-size: 16px; font-weight: 400; color: var(--text2); line-height: 1.1; }
+  .row .time .b { font-size: 12.5px; color: var(--muted); }
+  .row .cell { flex: 1; border-left: 1.5px solid var(--line); padding: 0 0 8px 8px; }
+  .lesson { position: relative; background: var(--tint); border-radius: 13px; min-height: 130px;
+    padding: 16px 16px 16px 26px; overflow: hidden; }
+  .lesson::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--accent); }
+  .lesson .s { font-size: 17px; font-weight: 700; color: var(--accent-d); }
+  .lesson .m1 .type { font-weight: 600; }
+  .lesson .m1 .dot { opacity: .5; margin: 0 5px; }
+  .lesson .m1 { font-size: 15px; color: var(--accent); margin-top: 6px; }
+  .lesson .m2 { font-size: 15px; color: var(--accent); margin-top: 30px; display: flex; justify-content: space-between; gap: 8px; }
+  .lesson .m2 .tag { font-size: 12px; color: var(--accent); opacity: .8; }
+  .row.gaprow .cell { padding: 4px 0 12px 8px; }
+  .gap { color: var(--muted); font-size: 13px; }
+  .empty { text-align: center; color: var(--muted); padding: 70px 24px 80px; }
+  .empty .t { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+
+  /* ================= SCAN / CODE ================= */
+  .scan-screen { min-height: calc(100vh - 80px); display: flex; flex-direction: column; align-items: center; }
+  .scan-body { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 var(--pad-x); }
+  .reticle { width: 190px; height: 190px; position: relative; }
+  .reticle i { position: absolute; width: 46px; height: 46px; border: 5px solid var(--accent); }
+  .reticle i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+  .reticle i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+  .reticle i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+  .reticle i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+  .reticle .ok { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .reticle .ok svg { width: 62px; height: 62px; color: var(--accent); }
+  .code-box { width: 100%; text-align: center; }
+  .code-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .cells { display: flex; justify-content: center; gap: 8px; }
+  .cells input { width: 40px; height: 40px; border: 1.5px solid var(--field-b); border-radius: var(--r-sm);
+    background: var(--field); color: var(--text); text-align: center; font-size: 17px; font-weight: 600; outline: none; }
+  .cells input:focus { border-color: var(--accent); }
+  .mode { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; }
+  .mode button { width: 34px; height: 34px; border: none; border-radius: var(--r-sm); background: var(--card);
+    color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .mode button svg { width: 18px; height: 18px; }
+  .mode button.sel { background: var(--accent); color: #fff; }
+  .mode button.txt { font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
+
+  /* ================= QR DISPLAY (teacher) ================= */
+  .qr-card { margin: 60px var(--pad-x) 0; padding: 26px 20px 20px; text-align: center; }
+  .qr-card .code { font-size: 26px; font-weight: 500; letter-spacing: .32em; margin-bottom: 16px; padding-left: .32em; }
+  .qr-card #qr { display: flex; justify-content: center; }
+  .qr-card #qr img, .qr-card #qr canvas { width: 240px !important; height: 240px !important; }
+  .qr-card .bar { height: 5px; border-radius: 4px; background: var(--tint2); margin-top: 18px; overflow: hidden; }
+  .qr-card .bar i { display: block; height: 100%; background: var(--accent); width: 100%;
+    transform-origin: left; animation: shrink 60s linear infinite; }
+  @keyframes shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  /* ================= ATTENDANCE ================= */
+  .att-top { display: flex; gap: var(--gap); margin-bottom: var(--gap); }
+  .att-top .num { flex: 1; padding: 18px 16px; font-size: 20px; font-weight: 700; }
+  .att-top .sq { width: 62px; height: 62px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; color: var(--muted); }
+  .att-top .sq svg { width: 20px; height: 20px; }
+  .att-top .sq b { font-size: 12px; color: var(--text); }
+  .gauge-card { text-align: center; padding: 18px 16px 14px; margin-bottom: var(--gap); }
+  .gauge { position: relative; width: 190px; height: 104px; margin: 0 auto; }
+  .gauge svg { width: 190px; height: 104px; }
+  .gauge .val { position: absolute; left: 0; right: 0; bottom: 0; }
+  .gauge .val .p { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.05; }
+  .gauge .val .c { font-size: 11px; color: var(--text2); margin-top: 3px; }
+  .list { padding: 2px 16px; }
+  .list .li { display: flex; justify-content: space-between; align-items: center; padding: 11px 0;
+    border-bottom: .5px solid var(--line); font-size: 13.5px; }
+  .list .li:last-child { border-bottom: none; }
+  .list .li .v { color: var(--muted); }
+  .list .li .k { color: var(--muted); }
+  .list .li .k + .v { color: var(--text2); }
+  .list .li.link .v { color: var(--muted); }
+
+  /* ================= PROFILE ================= */
+  .logo-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: var(--gap); }
+  .seal { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent-d); flex: none;
+    display: flex; align-items: center; justify-content: center; color: var(--accent-d); }
+  .seal svg { width: 24px; height: 24px; }
+  .logo-t { font-size: 11px; font-weight: 800; letter-spacing: .2px; color: var(--accent-d); line-height: 1.15; }
+  .logo-t small { display: block; font-size: 8.5px; font-weight: 700; color: var(--text2); margin-top: 2px; }
+  .prof-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: var(--gap); }
+  .prof-card .pava { width: 54px; height: 54px; border-radius: var(--r-md); background: var(--tint); color: var(--accent); }
+  .prof-card .nm { flex: 1; font-size: 16px; font-weight: 700; }
+  .prof-card .edit { width: 34px; height: 34px; border: none; background: none; color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; }
+  .prof-card .edit svg { width: 18px; height: 18px; }
+  .demo-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
+
+  /* ================= NAV ================= */
+  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x); bottom: calc(14px + env(safe-area-inset-bottom));
+    z-index: 30; display: none; align-items: center; justify-content: space-between;
+    padding: 9px 22px; border-radius: 20px;
+    /* матовое стекло: контент под меню размывается, фон страницы не подкрашивается */
+    background: rgba(var(--card-rgb), .72);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid var(--line); }
+  /* если размытие не поддерживается — просто плотный фон, без полупрозрачности */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .nav { background: var(--card); }
+  }
+  .nav.on { display: flex; }
+  .nav button { border: none; background: none; cursor: pointer; color: var(--text2);
+    display: flex; align-items: center; justify-content: center; padding: 6px; }
+  .nav button { position: relative; }
+  /* Рисунок внутри рамки Lordicon занимает ~75%, но у каждой иконки чуть по-своему.
+     Размеры подобраны замером так, чтобы наибольшая сторона рисунка у всех была ровно 24px. */
+  .nav button lord-icon { width: 32px; height: 32px; display: block; }
+  .nav button[data-nav="home"] lord-icon { width: 31px; height: 31px; }
+  .nav button[data-nav="tt"] lord-icon { width: 29px; height: 29px; }
+  .nav button[data-nav="profile"] lord-icon { width: 29px; height: 29px; }
+  .nav button.active { color: var(--accent); }
+  .nav .fab, .nav .fab.active { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); color: #fff; padding: 0;
+    transition: transform .25s cubic-bezier(.34,1.45,.5,1); will-change: transform; }
+  .nav .fab:active { transform: scale(.84); transition-duration: .1s; }
+  .nav .fab lord-icon { width: 32px; height: 32px; }
+  /* Цвет иконок задаём CSS-переменными Lordicon: они наследуются в shadow DOM, работают
+     надёжнее атрибута colors (он у части файлов не применяется) и сами следуют теме.
+     --icon-bold — «жирность»: у System-иконок фигуры залиты, поэтому обводим их тем же цветом (BOLD_CSS). */
+  .nav button lord-icon { --lord-icon-primary: var(--text2); --lord-icon-secondary: var(--text2); --icon-bold: 0; }
+  .nav button.active lord-icon { --lord-icon-primary: var(--accent); --lord-icon-secondary: var(--accent); }
+  .nav .fab lord-icon, .nav .fab.active lord-icon { --lord-icon-primary: #fff; --lord-icon-secondary: #fff; }
+  .nav .fab.active lord-icon { --icon-bold: 8; }
+  .loading { text-align: center; color: var(--muted); padding: 100px 0; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">Loading…</div>
+
+<!-- ================= LOGIN (Welcome!) ================= -->
+<div id="s-login" class="screen">
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>Welcome!</h1>
+      <div class="field">
+        <input id="loginQ" type="text" placeholder="Group" autocomplete="off">
+        <div class="seg-mini"><button id="segS" class="sel">Student</button><button id="segT">Teacher</button></div>
+      </div>
+      <div class="suggest" id="loginList"></div>
+      <button class="btn" id="loginBtn">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= HOME ================= -->
+<div id="s-home" class="screen">
+  <div class="hbar">
+    <button class="hicon" id="homeMenu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+    <button class="hicon" id="homeMsg" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-4A8.4 8.4 0 1 1 21 11.5z"/></svg><span class="dot"></span></button>
+  </div>
+  <div class="pad">
+    <div class="card profile-card" id="homeProfile">
+      <div class="pava" id="homeAva"></div>
+      <div class="pinfo"><div class="pname" id="homeName">–</div><div class="prole" id="homeRole">Student</div></div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+    </div>
+    <div class="card sec">
+      <div class="sec-h" id="homeSeeAll"><h2>Schedule</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="sec-b"><div class="minis" id="homeSchedule"></div></div>
+    </div>
+    <div class="card sec">
+      <div class="sec-h" id="homeAtt"><h2>Attendance</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="sec-b"><div class="chart-wrap">
+        <div class="yaxis"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+        <div class="chart" id="homeChart"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= TIMETABLE ================= -->
+<div id="s-tt" class="screen">
+  <div class="tt">
+    <div class="tt-sticky">
+    <div class="card tt-card">
+      <div class="dl"><span class="big" id="ttDay">–</span><span class="sub" id="ttSub">–</span></div>
+      <button class="today-pill" id="ttToday">Today</button>
+    </div>
+    <div class="card week" id="ttWeek"><span class="wk-pill" id="ttPill"></span></div>
+    </div>
+    <div class="card tl-card" id="ttBody"></div>
+  </div>
+</div>
+
+<!-- ================= SCAN (student) ================= -->
+<div id="s-scan" class="screen">
+  <div class="scan-screen">
+    <div class="scan-body">
+      <div id="scanQR" class="reticle"><i></i><i></i><i></i><i></i>
+        <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg></div>
+      </div>
+      <div id="scanCode" class="code-box" style="display:none">
+        <h2>Enter confirmation code</h2>
+        <div class="cells" id="cells"></div>
+      </div>
+    </div>
+    <div class="mode">
+      <button class="txt" id="modeT">T</button>
+      <button class="sel" id="modeQ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= QR DISPLAY (teacher) ================= -->
+<div id="s-qr" class="screen">
+  <div class="card qr-card">
+    <div class="code" id="qrCode">ABCDE</div>
+    <div id="qr"></div>
+    <div class="bar"><i></i></div>
+  </div>
+  <div class="demo-note">Demo — a backend is needed to verify student check-ins.</div>
+</div>
+
+<!-- ================= ATTENDANCE ================= -->
+<div id="s-att" class="screen">
+  <div class="pad">
+    <div class="att-top">
+      <div class="card num" id="attNum">№–</div>
+      <div class="card sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg><b id="attOk">–</b></div>
+      <div class="card sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg><b id="attNo">–</b></div>
+    </div>
+    <div class="card gauge-card">
+      <div class="gauge">
+        <svg viewBox="0 0 190 104"><path d="M14 96 A81 81 0 0 1 176 96" fill="none" stroke="var(--tint2)" stroke-width="14" stroke-linecap="round"/><path id="gaugeArc" d="M14 96 A81 81 0 0 1 176 96" fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/></svg>
+        <div class="val"><div class="p" id="gaugePct">75%</div><div class="c" id="gaugeSub">You were absent 20/80</div></div>
+      </div>
+    </div>
+    <div class="card list" id="attList"></div>
+    <div class="demo-note">Attendance is demo data — real values need edupage login.</div>
+  </div>
+</div>
+
+<!-- ================= PROFILE ================= -->
+<div id="s-profile" class="screen">
+  <div class="pad">
+    <div class="card logo-card">
+      <div class="seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9 12 4 2 9l10 5 10-5z"/><path d="M6 11.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"/></svg></div>
+      <div class="logo-t">TURIN POLYTECHNIC<br>UNIVERSITY IN TASHKENT<small>EST. 2009</small></div>
+    </div>
+    <div class="card prof-card">
+      <div class="pava" id="profAva"></div>
+      <div class="nm" id="profName">–</div>
+      <button class="edit" id="changeBtn" aria-label="Change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+    </div>
+    <div class="card list" id="profList"></div>
+    <div class="demo-note" id="profUpdated"></div>
+  </div>
+</div>
+
+<!-- ================= NAV ================= -->
+<nav class="nav" id="nav">
+  <button data-nav="home" aria-label="Home"><lord-icon src="icons/home-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
+  <button data-nav="tt" aria-label="Timetable"><lord-icon src="icons/calendar-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
+  <button data-nav="scan" class="fab" aria-label="Check in"><lord-icon src="icons/qr-code.json" stroke="bold"></lord-icon></button>
+  <button data-nav="att" aria-label="Attendance"><lord-icon src="icons/bar-chart-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
+  <button data-nav="profile" aria-label="Profile"><lord-icon src="icons/info-circle-morph.json" data-morph="1" stroke="bold"></lord-icon></button>
+</nav>
+
+<script>
+const tg = window.Telegram ? Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+const TGU = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
+
+const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat"];
+const DOWS = ["M","T","W","T","F","S"];
+const MONS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const CHART_LBL = ["MON","TUE","WED","THU","FRI","SUN"];
+
+let DATA=null, profile=null, pickKind="class", selDay=0, scanMode="qr";
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const mins = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
+const clean = s => (s||"").replace(/\s*\(\w+\)$/,"");
+/* Короткое имя предмета для узких карточек: целиком, если влезает, иначе аббревиатура.
+   Готовые сокращения внутри названия (IoT, AI, QA) и номера курса (I, II, 1) сохраняем как есть. */
+const SUBJ_STOP = new Set(["and","of","the","to","in","for","on","with","a","an"]);
+// обрезка по границе слова, если она близко к краю, иначе просто по символам
+function cutSubj(s,max){
+  if(s.length<=max) return s;
+  const t=s.slice(0,max-1).trimEnd(), sp=t.lastIndexOf(" ");
+  return (sp>=max*0.6 ? t.slice(0,sp) : t)+"…";
+}
+function shortSubj(name, max=14){
+  const s=(name||"").trim();
+  if(s.length<=max) return s;
+  const parts=[];
+  s.split(/\s+/).forEach(word=>{
+    const w=word.replace(/[^\w'&+./-]/g,"");
+    if(!w || SUBJ_STOP.has(w.toLowerCase())) return;
+    const keep = /^[IVX]+$/.test(w) || /^\d/.test(w) || w.replace(/[^A-Z]/g,"").length>=2;
+    parts.push({w,keep});
+  });
+  // одно значимое слово — аббревиатура из единственной буквы бессмысленна, режем само слово
+  if(parts.length<2) return cutSubj(s,max);
+  const kept=parts.filter(p=>p.keep), letters=parts.filter(p=>!p.keep);
+  // "Introduction to IoT" → просто "IoT": одинокая буква перед готовым сокращением только мешает
+  if(kept.length && letters.length<2) return cutSubj(kept.map(p=>p.w).join(" "),max);
+  return cutSubj(parts.map(p=>p.keep?" "+p.w:p.w[0].toUpperCase()).join("").trim(),max);
+}
+function weekDates(){ const n=new Date(),s=new Date(n),wd=(n.getDay()+6)%7;
+  s.setDate(n.getDate()-wd+(wd===6?7:0)); return [...Array(6)].map((_,i)=>{const d=new Date(s);d.setDate(s.getDate()+i);return d;}); }
+function todayIndex(){ const wd=(new Date().getDay()+6)%7; return wd===6?0:wd; }
+function haptic(){ if(tg&&tg.HapticFeedback) try{tg.HapticFeedback.selectionChanged();}catch(e){} }
+function toast(m){ try{ if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2")) return tg.showAlert(m); }catch(e){} alert(m); }
+function seedOf(s){ return [...s].reduce((a,c)=>a+c.charCodeAt(0),0); }
+function initials(name){ const p=(name||"").replace(/[^A-Za-z0-9 .-]/g," ").trim().split(/[ .-]+/).filter(Boolean);
+  return (((p[0]||"")[0]||"")+((p[1]||"")[0]||""))||(name||"?")[0]; }
+function displayName(){ if(TGU&&(TGU.first_name||TGU.last_name)) return [TGU.first_name,TGU.last_name].filter(Boolean).join(" "); return profile.name; }
+
+/* ---------- storage ---------- */
+const hasCloud = tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9");
+function saveProfile(p){ const s=JSON.stringify(p); try{localStorage.setItem("ttpu_profile",s);}catch(e){}
+  if(hasCloud) try{tg.CloudStorage.setItem("profile",s,()=>{});}catch(e){} }
+function loadProfile(cb){ if(hasCloud){ try{ tg.CloudStorage.getItem("profile",(e,v)=>{
+    if(!e&&v){try{return cb(JSON.parse(v));}catch(_){}} cb(readLocal()); }); return; }catch(e){} } cb(readLocal()); }
+function readLocal(){ try{const v=localStorage.getItem("ttpu_profile");return v?JSON.parse(v):null;}catch(e){return null;} }
+function days(){ const pool=profile.kind==="class"?DATA.classes:DATA.teachers;
+  const e=pool.find(x=>x.name===profile.name); return e?e.days:[[],[],[],[],[],[]]; }
+
+/* ---------- nav ---------- */
+const SCREENS=["home","tt","scan","qr","att","profile"];
+function nav(to){
+  if(to==="scan"&&profile.kind==="teacher") to="qr";
+  SCREENS.forEach(n=>$("s-"+n).classList.toggle("active",n===to));
+  const navKey = to==="qr"?"scan":to;
+  [...$("nav").children].forEach(b=>{
+    const on=b.dataset.nav===navKey; b.classList.toggle("active",on);   // цвет иконки подхватит CSS
+    const ic=b.querySelector("lord-icon"); if(!ic) return;
+    if(ic.dataset.morph){ morphIcon(ic,on); return; }   // morph-select: вперёд = заливка, назад = контур
+    if(on) requestAnimationFrame(()=>playIcon(ic));
+  });
+  window.scrollTo(0,0);
+  ({home:renderHome, tt:renderTT, scan:renderScan, qr:renderQR, att:renderAtt, profile:renderProfile})[to]();
+  const i=NAV_ORDER.indexOf(navKey);
+  const dir = navPrev===null ? 1 : (Math.sign(i-navPrev) || 1);
+  navPrev=i;
+  if(to!=="tt") animateScreen(to,dir);   // у расписания своя анимация смены дня
+}
+[...document.querySelectorAll("#nav button")].forEach(b=>b.onclick=()=>{haptic();nav(b.dataset.nav);});
+// анимацию запускаем через playerInstance — у самого элемента <lord-icon> метода play нет
+function playIcon(ic){ const p=ic&&ic.playerInstance; if(!p) return; try{ p.direction=1; p.playFromBeginning(); }catch(e){} }
+// morph-иконка Lordicon ("morph-select:0.5"): один файл, где первая половина кадров — контур → заливка,
+// вторая — заливка → контур. Выбор: играем 0→середина и останавливаемся (заполненная);
+// снятие: середина→конец (снова контур).
+function morphIcon(ic,on){
+  if(ic._morphOn===undefined) ic._morphOn=false;   // файл стартует с контура
+  if(ic._morphOn===on) return;                     // уже в нужном виде — анимацию не гоняем
+  const p=ic.playerInstance;
+  if(!p||!p.lottie){ ic._morphPending=on; return; }
+  ic._morphOn=on;
+  try{
+    const L=p.lottie;
+    // длину берём из данных файла: после playSegments totalFrames становится длиной сегмента,
+    // а currentFrame у части иконок обнуляется — поэтому состояние храним сами, а не читаем кадр
+    const total = ic._morphTotal || (ic._morphTotal = (L.animationData ? (L.animationData.op - L.animationData.ip) : L.totalFrames));
+    const half = Math.round(total/2);
+    L.setDirection(1);
+    L.playSegments(on ? [0,half] : [half,total], true);
+  }catch(e){}
+}
+/* Толщина иконки. Фигуры System-иконок залиты (stroke у них нет), поэтому «жирность» даём
+   обводкой того же цвета под заливкой. Ширину берём из --icon-bold: она наследуется
+   в shadow DOM из обычного CSS, в единицах viewBox (240 → 32px, т.е. 8 ≈ +0.5px по контуру). */
+const BOLD_CSS = `svg path[fill].primary, svg path[fill].secondary {
+  stroke: var(--lord-icon-primary, currentColor);
+  stroke-width: var(--icon-bold, 0); stroke-linejoin: round; paint-order: stroke;
+  transition: stroke-width .25s ease; }`;
+function injectBold(ic){
+  if(ic._boldCss || !ic.shadowRoot) return;
+  ic._boldCss = true;
+  const s = document.createElement("style"); s.textContent = BOLD_CSS; ic.shadowRoot.appendChild(s);
+}
+// иконка активной вкладки: проиграть анимацию, как только загрузится файл
+document.querySelectorAll("#nav lord-icon").forEach(ic=>ic.addEventListener("ready",()=>{
+  injectBold(ic);
+  const on=ic.closest("button").classList.contains("active");
+  if(ic.dataset.morph){ if(on) morphIcon(ic,true); return; }
+  if(on) playIcon(ic);
+}));
+
+/* ---------- HOME ---------- */
+function attVals(){ const s=seedOf(profile.name); return CHART_LBL.map((_,i)=>Math.min(100,40+((s*(i*7+5))%60))); }
+function renderHome(){
+  $("homeAva").textContent = TGU ? "" : initials(profile.name).toUpperCase();
+  $("homeName").innerHTML = esc(displayName()).replace(" ","<br>");
+  $("homeRole").textContent = profile.kind==="class" ? "Student" : "Teacher";
+  const D=days(), ti=todayIndex(), today=D[ti]||[];
+  $("homeSchedule").innerHTML = today.length ? today.map(e=>`
+    <div class="mini" title="${esc(clean(e.s))}"><div class="t">${e.t.split("–")[0]}</div><div class="s">${esc(shortSubj(clean(e.s)))}</div><div class="r">${esc(e.r||"—")}</div></div>`).join("")
+    : `<div class="mini none">No classes today</div>`;
+  const vals=attVals(), hi=Math.min(ti,5);
+  $("homeChart").innerHTML = CHART_LBL.map((n,i)=>`<div class="col ${i===hi?'hi':''}"><div class="bar" style="height:${vals[i]}%"></div><div class="lbl">${n}</div></div>`).join("");
+}
+$("homeSeeAll").onclick=()=>{haptic();nav("tt");};
+$("homeAtt").onclick=()=>{haptic();nav("att");};
+$("homeProfile").onclick=()=>{haptic();nav("profile");};
+$("homeMenu").onclick=()=>{haptic();nav("profile");};
+$("homeMsg").onclick=()=>toast("No new notifications.");
+
+/* ---------- TIMETABLE ---------- */
+/* неделя Пн–Сб (6 дней), индексы совпадают с данными */
+let ttSel = todayIndex(), ttPrev = null;
+function renderTT(){
+  // направление перехода: вперёд по неделе — карточки приезжают справа, назад — слева
+  const first = ttPrev===null;
+  const dir = first ? 1 : Math.sign(ttSel-ttPrev) || 0;
+  ttPrev = ttSel;
+  const D=weekDates(), d=D[ttSel], todayStr=new Date().toDateString();
+  $("ttDay").textContent=d.getDate();
+  $("ttSub").innerHTML=`${DOW[ttSel]}<br>${MONS[d.getMonth()]} ${d.getFullYear()}`;
+  // кнопки пересоздаём, а плашку-индикатор оставляем на месте — иначе переезд не анимируется
+  const wk=$("ttWeek");
+  wk.querySelectorAll(".d").forEach(n=>n.remove());
+  DOWS.forEach((l,i)=>{ const dd=D[i];
+    const b=document.createElement("button");
+    b.className=["d", i===ttSel?"sel":"", dd.toDateString()===todayStr?"today":""].filter(Boolean).join(" ");
+    b.dataset.d=i;
+    b.innerHTML=`<span class="dw">${l}</span><span class="dn">${dd.getDate()}</span>`;
+    b.onclick=()=>{ ttSel=i; haptic(); renderTT(); };
+    wk.appendChild(b);
+  });
+  movePill(first);
+  const day = days()[ttSel]||[];
+  if(!day.length){ $("ttBody").innerHTML=`<div class="empty"><div class="t">No classes</div>Enjoy your free day</div>`; animateDay(dir); return; }
+  let h="";
+  day.forEach((e,i)=>{
+    if(i){ const g=mins(e.t.split("–")[0])-mins(day[i-1].t.split("–")[1]);
+      if(g>20){const hh=Math.floor(g/60),mm=g%60;
+        h+=`<div class="row gaprow"><div class="time"></div><div class="cell"><div class="gap">${hh?hh+"h ":""}${mm?mm+"m":""} break</div></div></div>`;} }
+    const [st,en]=e.t.split("–");
+    const who = profile.kind==="class" ? (e.tc||"") : (e.c||"");
+    const type = {lec:"Lecture",prac:"Practice",lab:"Lab",sem:"Seminar"}[e.x]||"";
+    h+=`<div class="row"><div class="time"><div class="a">${st}</div><div class="b">${en}</div></div>
+      <div class="cell"><div class="lesson"><div class="s">${esc(clean(e.s))}</div>
+        <div class="m1">${type?`<span class="type">${type}</span>`:""}${type&&e.r?`<span class="dot">·</span>`:""}${esc(e.r||"")}</div>
+        <div class="m2"><span>${esc(who)}</span>${e.g?`<span class="tag">${esc(e.g)}</span>`:""}</div></div></div></div>`;
+  });
+  $("ttBody").innerHTML=h;
+  animateDay(dir);
+}
+// плашка выбранного дня: едет к нужной кнопке (при первой отрисовке — без анимации)
+function movePill(instant){
+  const sel=$("ttWeek").querySelector(".d.sel"), pill=$("ttPill");
+  if(!sel||!pill) return;
+  if(instant) pill.style.transition="none";
+  pill.style.width=sel.offsetWidth+"px";
+  pill.style.height=sel.offsetHeight+"px";
+  pill.style.transform=`translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
+  if(instant){ void pill.offsetWidth; pill.style.transition=""; }
+}
+// появление списка пар: сдвиг в сторону перехода + ступенчатая задержка по строкам
+function animateDay(dir){
+  const box=$("ttBody");
+  box.style.setProperty("--dx", (dir<0 ? -22 : 22)+"px");
+  const items=[...box.children];
+  items.forEach((el,i)=>el.style.setProperty("--i", Math.min(i,8)));
+  box.classList.remove("day-in");
+  void box.offsetWidth;            // перезапуск анимации
+  box.classList.add("day-in");
+}
+/* Та же анимация при смене вкладки. Анимируем карточки внутри .pad (или содержимое
+   экрана, если .pad нет), направление — из порядка вкладок в нижнем меню. */
+const NAV_ORDER = ["home","tt","scan","att","profile"];
+let navPrev = null;
+function animateScreen(id, dir){
+  const scr=$("s-"+id); if(!scr) return;
+  const box=scr.querySelector(".pad")||scr.querySelector(".scan-screen")||scr;
+  scr.style.setProperty("--dx", (dir<0 ? -22 : 22)+"px");
+  [...box.children].forEach((el,i)=>el.style.setProperty("--i", Math.min(i,8)));
+  box.classList.remove("anim-in");
+  void box.offsetWidth;
+  box.classList.add("anim-in");
+}
+$("ttToday").onclick=()=>{ttSel=todayIndex();haptic();renderTT();};
+
+/* Свайп по расписанию: влево — следующий день, вправо — предыдущий.
+   Список тянется за пальцем; на отпускании либо переключает день, либо отпружинивает. */
+(function(){
+  const zone=$("s-tt"), body=()=>$("ttBody");
+  let x0=null, y0=null, axis=null, t0=0, moved=false, dragEndAt=0;
+  const release=(spring)=>{ const b=body();
+    b.style.transition = spring ? "transform .28s cubic-bezier(.3,1.2,.5,1), opacity .2s ease" : "";
+    b.style.transform=""; b.style.opacity="";
+    if(spring) setTimeout(()=>{ b.style.transition=""; },300);
+  };
+  zone.addEventListener("pointerdown",e=>{
+    if(e.pointerType==="mouse" && e.button!==0) return;
+    x0=e.clientX; y0=e.clientY; axis=null; t0=Date.now(); moved=false; dragEndAt=0;
+  });
+  zone.addEventListener("pointermove",e=>{
+    if(x0===null) return;
+    const dx=e.clientX-x0, dy=e.clientY-y0;
+    if(axis===null){                      // ось выбираем один раз, чтобы не мешать вертикальной прокрутке
+      if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+      axis = Math.abs(dx)>Math.abs(dy) ? "x" : "y";
+    }
+    if(axis!=="x") return;
+    moved=true;
+    const b=body(); b.classList.remove("day-in");
+    const edge = (dx>0 && ttSel===0) || (dx<0 && ttSel===5);
+    b.style.transition="";
+    b.style.transform=`translateX(${dx*(edge?0.18:0.45)}px)`;   // у края недели тянется туже
+    b.style.opacity=String(Math.max(.5, 1-Math.abs(dx)/420));
+  });
+  const end=e=>{
+    if(x0===null) return;
+    const dx=(e.clientX!==undefined?e.clientX:x0)-x0, dt=Date.now()-t0, wasX=(axis==="x");
+    x0=null; axis=null;
+    if(moved) dragEndAt=Date.now();
+    if(!wasX){ if(moved) release(true); return; }
+    const next=ttSel+(dx<0?1:-1);
+    const enough = Math.abs(dx)>70 || (Math.abs(dx)>30 && dt<300);   // длинный либо быстрый смах
+    if(enough && next>=0 && next<=5){ release(false); ttSel=next; haptic(); renderTT(); }
+    else release(true);
+  };
+  zone.addEventListener("pointerup",end);
+  zone.addEventListener("pointercancel",end);
+  // клик, прилетевший сразу за перетаскиванием, гасим — иначе сработает кнопка под пальцем.
+  // Ограничение по времени: залежавшийся флаг не должен съесть обычный тап позже.
+  zone.addEventListener("click",e=>{
+    if(dragEndAt && Date.now()-dragEndAt<400){ dragEndAt=0; e.stopPropagation(); e.preventDefault(); }
+  },true);
+})();
+
+/* ---------- SCAN (student) ---------- */
+function renderScan(){ setScanMode(scanMode); }
+function setScanMode(m){ scanMode=m;
+  $("scanQR").style.display = m==="qr"?"":"none";
+  $("scanCode").style.display = m==="qr"?"none":"";
+  $("modeQ").classList.toggle("sel",m==="qr"); $("modeT").classList.toggle("sel",m!=="qr");
+  if(m!=="qr"&&!$("cells").children.length){
+    $("cells").innerHTML=[...Array(6)].map(()=>`<input inputmode="numeric" maxlength="1">`).join("");
+    const cs=[...$("cells").children];
+    cs.forEach((c,i)=>{ c.oninput=()=>{ c.value=c.value.replace(/\D/g,"").slice(-1);
+        if(c.value&&i<5) cs[i+1].focus();
+        if(cs.every(x=>x.value)){ toast("Code "+cs.map(x=>x.value).join("")+" — demo: a backend is needed to confirm attendance."); cs.forEach(x=>x.value=""); cs[0].focus(); } };
+      c.onkeydown=ev=>{ if(ev.key==="Backspace"&&!c.value&&i>0) cs[i-1].focus(); }; });
+  }
+  if(m!=="qr") setTimeout(()=>$("cells").children[0].focus(),50);
+}
+$("modeT").onclick=()=>{haptic();setScanMode("text");};
+$("modeQ").onclick=()=>{haptic();setScanMode("qr");};
+$("scanQR").onclick=()=>{ if(tg&&tg.showScanQrPopup) try{ tg.showScanQrPopup({text:"Scan the class QR"},(t)=>{ tg.closeScanQrPopup(); toast("Scanned: "+t+" — demo, no backend yet."); return true; }); return; }catch(e){}
+  toast("Demo — QR scanning works inside Telegram; a backend is needed to record attendance."); };
+
+/* ---------- QR display (teacher) ---------- */
+let qrMade=false;
+function renderQR(){
+  const code=[...Array(5)].map((_,i)=>String.fromCharCode(65+((seedOf(profile.name)*(i+3)+new Date().getHours())%26))).join("");
+  $("qrCode").textContent=code;
+  $("qr").innerHTML="";
+  if(window.QRCode) try{ new QRCode($("qr"),{text:"ttpu-attendance:"+profile.name+":"+code,width:240,height:240,correctLevel:QRCode.CorrectLevel.M}); }catch(e){}
+}
+
+/* ---------- ATTENDANCE ---------- */
+function renderAtt(){
+  const s=seedOf(profile.name), pct=68+s%28, total=80, absent=Math.round(total*(1-pct/100));
+  $("attNum").textContent="№"+((DATA.week||"").match(/\d+/)||["–"])[0];
+  $("attOk").textContent=total-absent; $("attNo").textContent=absent;
+  $("gaugePct").textContent=pct+"%"; $("gaugeSub").textContent=`You were absent ${absent}/${total}`;
+  const arc=$("gaugeArc"), len=arc.getTotalLength(); arc.style.strokeDasharray=len; arc.style.strokeDashoffset=len*(1-pct/100);
+  const subs=[...new Set(days().flat().map(e=>clean(e.s)))];
+  $("attList").innerHTML = subs.map((n,i)=>`<div class="li"><span>${esc(n)}</span><span class="v">${(s*(i+2))%5}/16</span></div>`).join("")
+    || `<div class="li"><span class="muted">No subjects</span></div>`;
+}
+
+/* ---------- PROFILE ---------- */
+function renderProfile(){
+  $("profAva").textContent=initials(displayName()).toUpperCase();
+  $("profName").textContent=displayName();
+  const rows=[
+    [profile.kind==="class"?"Group":"Teacher", profile.name],
+    ["Phone number", "—"],
+    ["Tg user", TGU&&TGU.username ? "@"+TGU.username : "—"],
+  ];
+  $("profList").innerHTML = rows.map(([k,v])=>`<div class="li"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("")
+    + [1,2,3].map(()=>`<div class="li link"><span class="k">Settings</span><span class="v">›</span></div>`).join("");
+  $("profUpdated").textContent="Timetable: "+(DATA.week||"")+" · updated "+DATA.updated;
+}
+$("changeBtn").onclick=()=>{haptic();showLogin();};
+
+/* ---------- LOGIN ---------- */
+function showLogin(){
+  SCREENS.forEach(n=>$("s-"+n).classList.remove("active"));
+  $("nav").classList.remove("on"); $("s-login").classList.add("active");
+  $("loginQ").value=""; renderSuggest();
+  if(tg&&profile){ try{tg.BackButton.show();tg.BackButton.onClick(()=>{tg.BackButton.hide();enterApp();});}catch(e){} }
+}
+function pool(){ return pickKind==="class"?DATA.classes:DATA.teachers; }
+function renderSuggest(){
+  const q=$("loginQ").value.trim().toLowerCase();
+  const items=pool().filter(e=>e.name.toLowerCase().includes(q)).slice(0,30);
+  $("loginList").classList.toggle("on", q.length>0 && items.length>0);
+  $("loginList").innerHTML=items.map(e=>`<button>${esc(e.name)}</button>`).join("");
+  [...$("loginList").children].forEach((b,i)=>b.onclick=()=>{ $("loginQ").value=items[i].name; $("loginList").classList.remove("on"); });
+}
+function segPick(k){ pickKind=k; $("segS").classList.toggle("sel",k==="class"); $("segT").classList.toggle("sel",k==="teacher");
+  $("loginQ").placeholder=k==="class"?"Group":"Teacher"; renderSuggest(); }
+$("segS").onclick=()=>segPick("class"); $("segT").onclick=()=>segPick("teacher");
+$("loginQ").oninput=renderSuggest;
+$("loginQ").onkeydown=e=>{ if(e.key==="Enter") $("loginBtn").click(); };
+$("loginBtn").onclick=()=>{
+  const q=$("loginQ").value.trim().toLowerCase();
+  const hit=pool().find(e=>e.name.toLowerCase()===q)||pool().find(e=>e.name.toLowerCase().includes(q)&&q);
+  if(!hit){ toast(pickKind==="class"?"Enter your group, e.g. SE1-24":"Enter your last name"); return; }
+  profile={kind:pickKind,name:hit.name}; saveProfile(profile); haptic();
+  if(tg)try{tg.BackButton.hide();}catch(e){}
+  enterApp();
+};
+
+/* ---------- boot ---------- */
+function enterApp(){ $("s-login").classList.remove("active"); $("nav").classList.add("on"); ttSel=todayIndex(); nav("home"); }
+fetch("data.json?v="+Date.now()).then(r=>r.json()).then(d=>{
+  DATA=d; $("loading").style.display="none";
+  loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); });
+}).catch(()=>{ $("loading").textContent="Failed to load data."; });
+</script>
+</body>
+</html>

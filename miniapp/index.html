@@ -442,7 +442,9 @@
     min-width: 25px; height: 25px; margin-left: 6px; border-radius: 100px;
     font-size: 14px; font-weight: 700; color: var(--text); }
   .tg-day.today b { background: var(--accent); color: #fff; }
-  .tg-body { position: relative; display: grid;
+  /* отступ сверху — подпись первого часа центрируется на линии и выступает
+     над сеткой; без него она налезает на границу шапки */
+  .tg-body { position: relative; display: grid; margin-top: 10px;
     grid-template-columns: var(--tg-gutter) repeat(6, minmax(0,1fr)); }
   .tg-hours { position: relative; }
   .tg-hours span { position: absolute; right: 10px; transform: translateY(-50%);
@@ -970,7 +972,14 @@ function renderTTGrid(){
     lo=Math.min(lo,mins(a)); hi=Math.max(hi,mins(b)); });
   if(!isFinite(lo)){ lo=8*60; hi=18*60; }
   const from=Math.floor(lo/60)*60, to=Math.ceil(hi/60)*60;
-  const HH=58, H=(to-from)/60*HH, y=m=>(m-from)/60*HH;
+  /* Высота часа подстраивается под окно: при фиксированных 58px сетка занимала
+     290px из 900 и выглядела тесной, а под ней оставалась пустота. Границы
+     держим разумными, чтобы на низком окне не сплющило, а на высоком не
+     растянуло до нелепого. innerHeight в реальных px — делим на масштаб. */
+  const span=(to-from)/60;
+  const avail=(innerHeight/uiScale) - 230;
+  const HH=Math.max(52, Math.min(96, avail/span));
+  const H=span*HH, y=m=>(m-from)/60*HH;
   const hLabel=h=>((h%12)||12)+(h<12?" AM":" PM");
 
   let hours="";
@@ -995,7 +1004,7 @@ function renderTTGrid(){
       const h=Math.max(28, y(it.t)-y(it.s)-3);
       return `<div class="tg-ev" style="top:${y(it.s)}px;height:${h}px;`
            + `left:calc(${L}% + 3px);width:calc(${w}% - 6px)">`
-           + `<div class="sj">${esc(shortSubj(clean(it.e.s),22))}</div>`
+           + `<div class="sj">${esc(clean(it.e.s))}</div>`
            + `<div class="tm">${esc(it.a)}</div>`
            + (meta?`<div class="mt">${meta}</div>`:"")
            + `</div>`;
@@ -1009,7 +1018,7 @@ function renderTTGrid(){
     if(di<6 && nm>=from && nm<=to) now=`<div class="tg-now" style="top:${y(nm)}px"></div>`;
   }
 
-  $("ttGrid").innerHTML = `<div class="tg"><div class="tg-hd"><span></span>`
+  $("ttGrid").innerHTML = `<div class="tg" style="--hour-h:${HH}px"><div class="tg-hd"><span></span>`
     + DOW.map((nm,i)=>`<span class="tg-day${D[i].toDateString()===todayStr?" today":""}">${nm}<b>${D[i].getDate()}</b></span>`).join("")
     + `</div><div class="tg-body" style="height:${H}px">`
     + `<div class="tg-hours">${hours}</div>${cols}${now}</div></div>`;

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F2F7">
 <title>TTPU Student</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -26,20 +27,37 @@
        карточка 20, вложенный элемент 12 (концентрично: 20 − 8 отступа), мелкий 8. */
     --r-lg: 20px; --r-md: 12px; --r-sm: 8px;
     --pad-x: 12px; --gap: 10px; --pad-b: 100px;
+    /* Полноэкранный режим: сверху — вырез/статус-бар плюс полоса с кнопками Telegram.
+       env() и переменные Telegram могут дублировать друг друга, поэтому берём max(). */
+    --safe-top: calc(max(var(--tg-safe-area-inset-top, 0px), env(safe-area-inset-top, 0px))
+                     + var(--tg-content-safe-area-inset-top, 0px));
+    --safe-bot: max(var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
   }
+  /* Тёмная тема. Обычно data-theme выставляет скрипт в <head> ещё до первой отрисовки;
+     media-запрос оставлен запасным вариантом, если скрипт почему-то не отработал. */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme]) {
       --accent: #5DA2F5; --accent-d: #7DB6F8; --tint: #1B2A3D; --tint2: #24425F;
       --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
       --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
     }
   }
+  :root[data-theme="dark"] {
+    --accent: #5DA2F5; --accent-d: #7DB6F8; --tint: #1B2A3D; --tint2: #24425F;
+    --bg: #000000; --bg-rgb: 0, 0, 0; --card: #1C1C1E; --card-rgb: 28, 28, 30; --text: #FFFFFF; --text2: #EBEBF5;
+    --muted: #8E8E93; --line: #2C2C2E; --field: #2C2C2E; --field-b: #3A3A3C;
+  }
+  /* смена темы не должна выглядеть как перезагрузка страницы */
+  body, .card, .nav, .lesson, .mini, .field input, .seg, .lock-badge .ic {
+    transition: background-color .25s ease, color .25s ease, border-color .25s ease; }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
   html, body { height: 100%; scrollbar-width: none; -ms-overflow-style: none; }
   ::-webkit-scrollbar { display: none; width: 0; height: 0; }
   body {
     background: var(--bg); color: var(--text);
+    /* в полноэкранном режиме контент начинается под статус-баром — отступаем на его высоту */
+    padding-top: var(--safe-top);
     font: 15px/1.4 "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
           "Helvetica Neue", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -57,7 +75,7 @@
   .btn.ghost { background: var(--tint); color: var(--accent); }
 
   /* ================= LOGIN ================= */
-  .login-wrap { min-height: 100vh; display: flex; align-items: center; padding: 0 var(--pad-x); }
+  .login-wrap { min-height: calc(100dvh - var(--safe-top)); display: flex; align-items: center; padding: 0 var(--pad-x); }
   .login-card { width: 100%; padding: 22px 16px 20px; }
   .login-card h1 { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 18px; }
   .lbl { font-size: 11.5px; font-weight: 600; color: var(--text2); margin: 0 0 6px 2px; }
@@ -126,7 +144,9 @@
   .tt { padding: 0 var(--pad-x) var(--pad-b); }
   /* шапка расписания закрепляется при прокрутке: дата и строка дней остаются на экране.
      Общая обёртка с фоном страницы — иначе в зазор между карточками просвечивал бы контент. */
-  .tt-sticky { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 var(--gap); }
+  /* липнет не к нулю, а к нижней границе статус-бара: иначе в полноэкранном режиме
+     шапка уезжает под часы и кнопки Telegram */
+  .tt-sticky { position: sticky; top: var(--safe-top); z-index: 5; background: var(--bg); padding: 8px 0 var(--gap); }
   .tt-card { display: flex; align-items: center; justify-content: space-between;
     padding: 18px 20px 18px 22px; margin-bottom: 10px; }
   .tt-card .dl { display: flex; align-items: center; }
@@ -176,7 +196,7 @@
   .empty .t { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
 
   /* ================= SCAN / CODE ================= */
-  .scan-screen { min-height: calc(100vh - 80px); display: flex; flex-direction: column; align-items: center; }
+  .scan-screen { min-height: calc(100dvh - var(--safe-top) - 80px); display: flex; flex-direction: column; align-items: center; }
   .scan-body { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 var(--pad-x); }
   .reticle { width: 190px; height: 190px; position: relative; }
   .reticle i { position: absolute; width: 46px; height: 46px; border: 5px solid var(--accent); }
@@ -247,7 +267,7 @@
   .demo-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
 
   /* ================= NAV ================= */
-  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x); bottom: calc(14px + env(safe-area-inset-bottom));
+  .nav { position: fixed; left: var(--pad-x); right: var(--pad-x); bottom: calc(14px + var(--safe-bot));
     z-index: 30; display: none; align-items: center; justify-content: space-between;
     padding: 9px 22px; border-radius: 20px;
     /* матовое стекло: контент под меню размывается, фон страницы не подкрашивается */
@@ -281,8 +301,50 @@
   .nav button.active lord-icon { --lord-icon-primary: var(--accent); --lord-icon-secondary: var(--accent); }
   .nav .fab lord-icon, .nav .fab.active lord-icon { --lord-icon-primary: #fff; --lord-icon-secondary: #fff; }
   .nav .fab.active lord-icon { --icon-bold: 8; }
+  /* ================= ЗАГЛУШКИ ================= */
+  /* Разделы без реальной логики: содержимое размывается и перестаёт ловить нажатия,
+     поверх — значок замка. Так видно, что блок задуман, но ещё не работает. */
+  .lock-wrap { position: relative; }
+  .locked { filter: blur(7px) saturate(.5); opacity: .5; pointer-events: none; user-select: none; }
+  .locked.fill { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; }
+  .lock-badge { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 7px; text-align: center; padding: 0 16px; }
+  /* у экранов с .pad снизу 100px под меню — иначе замок уезжает выше центра */
+  .pad.lock-wrap > .lock-badge { bottom: var(--pad-b); }
+  .lock-badge .ic { width: 38px; height: 38px; border-radius: 50%; background: var(--card);
+    border: .5px solid var(--line); color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .lock-badge .ic svg { width: 19px; height: 19px; }
+  .lock-badge .t { font-size: 14px; font-weight: 600; color: var(--text2); }
+  .lock-badge .s { font-size: 12px; color: var(--muted); margin-top: -3px; }
+  .lock-badge.sm { gap: 5px; }
+  .lock-badge.sm .ic { width: 30px; height: 30px; }
+  .lock-badge.sm .ic svg { width: 15px; height: 15px; }
+  .lock-badge.sm .t { font-size: 12.5px; }
+
+  /* ================= НАСТРОЙКИ ================= */
+  .set-card { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 16px; margin-bottom: var(--gap); }
+  .set-card .k { font-size: 13.5px; color: var(--text2); }
+  /* вложенный элемент: радиус 12 как у остальных, у кнопок концентрично 12 − 3 = 9 */
+  .seg { display: flex; gap: 2px; background: var(--bg); border-radius: var(--r-md); padding: 3px; }
+  .seg button { border: none; background: none; color: var(--muted); font-size: 12.5px; font-weight: 600;
+    padding: 6px 11px; border-radius: 9px; cursor: pointer; transition: background .2s ease, color .2s ease; }
+  .seg button.sel { background: var(--accent); color: #fff; }
+
   .loading { text-align: center; color: var(--muted); padding: 100px 0; }
 </style>
+<script>
+/* Тему ставим до первой отрисовки: иначе на тёмной теме кадр мелькнёт светлым. */
+(function(){
+  var m="auto"; try{ m=localStorage.getItem("ttpu_theme")||"auto"; }catch(e){}
+  var t=m;
+  if(m!=="light"&&m!=="dark"){
+    var tgc=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.colorScheme)||null;
+    t = tgc || ((window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light");
+  }
+  document.documentElement.dataset.theme = (t==="dark"?"dark":"light");
+})();
+</script>
 </head>
 <body>
 
@@ -307,7 +369,7 @@
 <div id="s-home" class="screen">
   <div class="hbar">
     <button class="hicon" id="homeMenu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <button class="hicon" id="homeMsg" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-4A8.4 8.4 0 1 1 21 11.5z"/></svg><span class="dot"></span></button>
+    <button class="hicon" id="homeMsg" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-4A8.4 8.4 0 1 1 21 11.5z"/></svg></button>
   </div>
   <div class="pad">
     <div class="card profile-card" id="homeProfile">
@@ -321,9 +383,12 @@
     </div>
     <div class="card sec">
       <div class="sec-h" id="homeAtt"><h2>Attendance</h2><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-      <div class="sec-b"><div class="chart-wrap">
-        <div class="yaxis"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
-        <div class="chart" id="homeChart"></div></div></div>
+      <div class="sec-b lock-wrap">
+        <div class="locked"><div class="chart-wrap">
+          <div class="yaxis"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+          <div class="chart" id="homeChart"></div></div></div>
+        <div class="lock-badge sm" data-title="Coming soon"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -344,7 +409,8 @@
 
 <!-- ================= SCAN (student) ================= -->
 <div id="s-scan" class="screen">
-  <div class="scan-screen">
+  <div class="scan-screen lock-wrap">
+    <div class="locked fill">
     <div class="scan-body">
       <div id="scanQR" class="reticle"><i></i><i></i><i></i><i></i>
         <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg></div>
@@ -358,22 +424,29 @@
       <button class="txt" id="modeT">T</button>
       <button class="sel" id="modeQ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01"/></svg></button>
     </div>
+    </div>
+    <div class="lock-badge" data-title="Coming soon" data-sub="Check-in needs a server"></div>
   </div>
 </div>
 
 <!-- ================= QR DISPLAY (teacher) ================= -->
 <div id="s-qr" class="screen">
-  <div class="card qr-card">
-    <div class="code" id="qrCode">ABCDE</div>
-    <div id="qr"></div>
-    <div class="bar"><i></i></div>
+  <div class="lock-wrap">
+    <div class="locked">
+      <div class="card qr-card">
+        <div class="code" id="qrCode">ABCDE</div>
+        <div id="qr"></div>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+    <div class="lock-badge" data-title="Coming soon" data-sub="Check-in needs a server"></div>
   </div>
-  <div class="demo-note">Demo — a backend is needed to verify student check-ins.</div>
 </div>
 
 <!-- ================= ATTENDANCE ================= -->
 <div id="s-att" class="screen">
-  <div class="pad">
+  <div class="pad lock-wrap">
+    <div class="locked">
     <div class="att-top">
       <div class="card num" id="attNum">№–</div>
       <div class="card sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg><b id="attOk">–</b></div>
@@ -386,7 +459,8 @@
       </div>
     </div>
     <div class="card list" id="attList"></div>
-    <div class="demo-note">Attendance is demo data — real values need edupage login.</div>
+    </div>
+    <div class="lock-badge" data-title="Coming soon" data-sub="Attendance needs an edupage login"></div>
   </div>
 </div>
 
@@ -403,6 +477,22 @@
       <button class="edit" id="changeBtn" aria-label="Change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
     </div>
     <div class="card list" id="profList"></div>
+    <div class="card set-card">
+      <span class="k">Appearance</span>
+      <div class="seg" id="themeSeg">
+        <button data-t="auto">Auto</button>
+        <button data-t="light">Light</button>
+        <button data-t="dark">Dark</button>
+      </div>
+    </div>
+    <div class="lock-wrap">
+      <div class="locked"><div class="card list">
+        <div class="li"><span class="k">Notifications</span><span class="v">On</span></div>
+        <div class="li"><span class="k">Phone number</span><span class="v">+998 90 000 00 00</span></div>
+        <div class="li"><span class="k">Language</span><span class="v">English</span></div>
+      </div></div>
+      <div class="lock-badge sm" data-title="Coming soon"></div>
+    </div>
     <div class="demo-note" id="profUpdated"></div>
   </div>
 </div>
@@ -418,7 +508,16 @@
 
 <script>
 const tg = window.Telegram ? Telegram.WebApp : null;
-if (tg) { tg.ready(); tg.expand(); }
+const tgAtLeast = v => { try{ return !!(tg && tg.isVersionAtLeast && tg.isVersionAtLeast(v)); }catch(e){ return false; } };
+if (tg) {
+  tg.ready();
+  try{ tg.expand(); }catch(e){}
+  // Вертикальные свайпы отключаем до фуллскрина: иначе протяжка списка вниз закрывает окно.
+  try{ if(tgAtLeast("7.7")) tg.disableVerticalSwipes(); }catch(e){}
+  // Полноэкранный режим — Bot API 8.0. На старых клиентах и на десктопе просто не сработает,
+  // остаётся обычный развёрнутый вид от expand().
+  try{ if(tgAtLeast("8.0") && !tg.isFullscreen) tg.requestFullscreen(); }catch(e){}
+}
 const TGU = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
 
 const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -474,6 +573,43 @@ function saveProfile(p){ const s=JSON.stringify(p); try{localStorage.setItem("tt
 function loadProfile(cb){ if(hasCloud){ try{ tg.CloudStorage.getItem("profile",(e,v)=>{
     if(!e&&v){try{return cb(JSON.parse(v));}catch(_){}} cb(readLocal()); }); return; }catch(e){} } cb(readLocal()); }
 function readLocal(){ try{const v=localStorage.getItem("ttpu_profile");return v?JSON.parse(v):null;}catch(e){return null;} }
+
+/* ---------- тема ---------- */
+/* auto — следовать за Telegram (а вне Telegram — за системой), light/dark — принудительно. */
+const THEME_KEY="ttpu_theme";
+let themeMode = (()=>{ try{ return localStorage.getItem(THEME_KEY)||"auto"; }catch(e){ return "auto"; } })();
+function resolveTheme(mode){
+  if(mode==="light"||mode==="dark") return mode;
+  if(tg && tg.colorScheme) return tg.colorScheme==="dark"?"dark":"light";
+  try{ return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }catch(e){ return "light"; }
+}
+function applyTheme(mode,save){
+  themeMode=mode;
+  document.documentElement.dataset.theme=resolveTheme(mode);
+  const bg=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()||"#F2F2F7";
+  const meta=document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute("content",bg);
+  // Фон и шапку окна Telegram красим тем же цветом — иначе по краям видно чужой фон.
+  if(tgAtLeast("6.9")) try{ tg.setBackgroundColor(bg); tg.setHeaderColor(bg); }catch(e){}
+  if(save!==false){
+    try{ localStorage.setItem(THEME_KEY,mode); }catch(e){}
+    if(hasCloud) try{ tg.CloudStorage.setItem("theme",mode,()=>{}); }catch(e){}
+  }
+  renderThemeSeg();
+}
+function renderThemeSeg(){
+  [...document.querySelectorAll("#themeSeg button")].forEach(b=>b.classList.toggle("sel", b.dataset.t===themeMode));
+}
+[...document.querySelectorAll("#themeSeg button")].forEach(b=>b.onclick=()=>{ haptic(); applyTheme(b.dataset.t); });
+// В режиме auto следим за сменой темы в самом Telegram и в системе.
+if(tg&&tg.onEvent) try{ tg.onEvent("themeChanged",()=>{ if(themeMode==="auto") applyTheme("auto",false); }); }catch(e){}
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{ if(themeMode==="auto") applyTheme("auto",false); }); }catch(e){}
+
+/* Замок на неработающих блоках: svg рисуем в одном месте, чтобы не плодить копии в разметке. */
+const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="3"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>';
+document.querySelectorAll(".lock-badge").forEach(b=>{
+  b.innerHTML=`<span class="ic">${LOCK_SVG}</span><span class="t">${b.dataset.title||"Coming soon"}</span>`
+    + (b.dataset.sub?`<span class="s">${b.dataset.sub}</span>`:"");
+});
 function days(){ const pool=profile.kind==="class"?DATA.classes:DATA.teachers;
   const e=pool.find(x=>x.name===profile.name); return e?e.days:[[],[],[],[],[],[]]; }
 
@@ -730,11 +866,10 @@ function renderProfile(){
   $("profName").textContent=displayName();
   const rows=[
     [profile.kind==="class"?"Group":"Teacher", profile.name],
-    ["Phone number", "—"],
     ["Tg user", TGU&&TGU.username ? "@"+TGU.username : "—"],
   ];
-  $("profList").innerHTML = rows.map(([k,v])=>`<div class="li"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("")
-    + [1,2,3].map(()=>`<div class="li link"><span class="k">Settings</span><span class="v">›</span></div>`).join("");
+  $("profList").innerHTML = rows.map(([k,v])=>`<div class="li"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
+  renderThemeSeg();
   $("profUpdated").textContent="Timetable: "+(DATA.week||"")+" · updated "+DATA.updated;
 }
 $("changeBtn").onclick=()=>{haptic();showLogin();};
@@ -770,6 +905,9 @@ $("loginBtn").onclick=()=>{
 
 /* ---------- boot ---------- */
 function enterApp(){ $("s-login").classList.remove("active"); $("nav").classList.add("on"); ttSel=todayIndex(); nav("home"); }
+applyTheme(themeMode,false);
+// тема, выбранная на другом устройстве, приезжает из облака Telegram
+if(hasCloud) try{ tg.CloudStorage.getItem("theme",(e,v)=>{ if(!e&&v&&v!==themeMode) applyTheme(v,false); }); }catch(e){}
 fetch("data.json?v="+Date.now()).then(r=>r.json()).then(d=>{
   DATA=d; $("loading").style.display="none";
   loadProfile(p=>{ profile=p; if(profile) enterApp(); else showLogin(); });

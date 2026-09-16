@@ -41,6 +41,7 @@ jobs:
         run: |
           mkdir -p _site
           cp miniapp/index.html _site/
+          cp miniapp/diag.html  _site/
           cp miniapp/data.json  _site/
           cp miniapp/sw.js      _site/
           cp miniapp/icon-*.png _site/

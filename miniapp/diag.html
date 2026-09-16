@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Проверка Moodle — посещаемость</title>
+<style>
+  :root{
+    --bg:#F2F2F7; --card:#FFF; --text:#000; --muted:#6C6C70; --line:#E5E5EA;
+    --accent:#0A84FF; --ok:#1E7A3C; --bad:#C0392B; --warn:#8A5A00;
+    --okbg:#E8F7ED; --badbg:#FDEDEA; --warnbg:#FFF2E2; --code:#F6F6F9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#000; --card:#1C1C1E; --text:#FFF; --muted:#8E8E93; --line:#2C2C2E;
+      --accent:#5DA2F5; --ok:#45D67B; --bad:#FF6B5A; --warn:#FFB13D;
+      --okbg:#16301F; --badbg:#351F1C; --warnbg:#33250F; --code:#232326;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  main{max-width:720px;margin:0 auto;padding:24px 16px 64px}
+  h1{font-size:22px;margin:0 0 6px}
+  .lead{color:var(--muted);margin:0 0 20px}
+  .card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 10px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input{width:100%;padding:11px 12px;font-size:16px;color:var(--text);
+    background:var(--bg);border:1px solid var(--line);border-radius:10px}
+  button{font:inherit;font-weight:600;padding:11px 16px;border:0;border-radius:10px;
+    background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:var(--code);color:var(--text)}
+  button:disabled{opacity:.5;cursor:default}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .note{font-size:13px;color:var(--muted);margin-top:10px}
+  .err{color:var(--bad);font-size:14px;margin-top:10px;min-height:1em}
+  .chk{border-top:1px solid var(--line);padding:12px 0}
+  .chk:first-of-type{border-top:0}
+  .chk .hd{display:flex;gap:8px;align-items:baseline}
+  .chk .ttl{font-weight:600;flex:1}
+  .badge{flex:none;font-size:12px;font-weight:700;padding:2px 8px;border-radius:100px}
+  .badge.ok{background:var(--okbg);color:var(--ok)}
+  .badge.bad{background:var(--badbg);color:var(--bad)}
+  .badge.warn{background:var(--warnbg);color:var(--warn)}
+  .badge.run{background:var(--code);color:var(--muted)}
+  .chk .sum{color:var(--muted);font-size:14px;margin-top:4px;white-space:pre-wrap}
+  details{margin-top:8px}
+  summary{font-size:13px;color:var(--accent);cursor:pointer}
+  pre{background:var(--code);border-radius:10px;padding:10px;overflow:auto;
+    font-size:12px;max-height:320px;margin:8px 0 0}
+  textarea{width:100%;height:220px;background:var(--code);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;padding:10px;
+    font:12px/1.45 ui-monospace,Menlo,Consolas,monospace}
+</style>
+</head>
+<body>
+<main>
+  <h1>Проверка Moodle: посещаемость</h1>
+  <p class="lead">Страница только задаёт вопросы edu.turin.uz и показывает ответы.
+     Она ничего не отмечает, не создаёт и не меняет. Пароль никуда не сохраняется:
+     уходит один раз прямо в университет в обмен на токен доступа.</p>
+
+  <div class="card" id="authCard">
+    <h2>Доступ</h2>
+    <div id="fromApp" style="display:none">
+      <div class="note">Найден токен от мини-аппа на этом устройстве — пароль вводить не нужно.</div>
+      <div class="row"><button id="useSaved">Взять токен из приложения</button></div>
+    </div>
+    <label for="u">Логин edu.turin.uz</label>
+    <input id="u" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <label for="p">Пароль</label>
+    <input id="p" type="password" autocomplete="current-password">
+    <div class="row"><button id="signin">Войти и проверить</button></div>
+    <div class="err" id="authErr"></div>
+  </div>
+
+  <div class="card" id="runCard" style="display:none">
+    <h2>Проверки</h2>
+    <div id="checks"></div>
+    <div class="row">
+      <button id="again" class="ghost">Повторить</button>
+      <button id="autologin" class="ghost">Проверить одноразовый ключ входа</button>
+    </div>
+    <div class="note">Ключ входа проверяется отдельной кнопкой: Moodle выдаёт его
+      не чаще раза в несколько минут, и тратить его на каждый прогон незачем.</div>
+  </div>
+
+  <div class="card" id="repCard" style="display:none">
+    <h2>Отчёт</h2>
+    <div class="note">Токен и пароль в отчёт не попадают. Этот текст можно прислать мне.</div>
+    <div class="row"><button id="copy" class="ghost">Скопировать</button></div>
+    <textarea id="rep" readonly></textarea>
+  </div>
+</main>
+
+<script>
+const LMS = "https://edu.turin.uz";
+const $ = id => document.getElementById(id);
+let token = "", report = [], modules = [];
+
+/* Moodle ждёт вложенные параметры в виде args[0][name] — раскладываем объекты в плоский вид */
+function params(o){
+  const p = new URLSearchParams();
+  const add = (k, v) => {
+    if (v && typeof v === "object") Object.entries(v).forEach(([kk, vv]) => add(k + "[" + kk + "]", vv));
+    else p.append(k, v);
+  };
+  Object.entries(o).forEach(([k, v]) => add(k, v));
+  return p;
+}
+async function call(fn, extra){
+  const body = params(Object.assign({ wstoken: token, wsfunction: fn, moodlewsrestformat: "json" }, extra || {}));
+  const r = await fetch(LMS + "/webservice/rest/server.php", { method: "POST", body });
+  const j = await r.json();
+  if (j && j.exception){ const e = new Error(j.message || j.errorcode); e.code = j.errorcode; throw e; }
+  return j;
+}
+/* POST, а не GET: в строке запроса пароль осел бы в истории браузера и логах сервера */
+async function login(user, pass){
+  const body = new URLSearchParams({ username: user, password: pass, service: "moodle_mobile_app" });
+  const r = await fetch(LMS + "/login/token.php", { method: "POST", body });
+  const j = await r.json();
+  if (j.error) throw new Error(j.errorcode === "invalidlogin" ? "Неверный логин или пароль" : j.error);
+  if (!j.token) throw new Error("Moodle не вернул токен");
+  return j.token;
+}
+
+function row(title){
+  const d = document.createElement("div");
+  d.className = "chk";
+  d.innerHTML = '<div class="hd"><span class="ttl"></span><span class="badge run">идёт…</span></div><div class="sum"></div>';
+  d.querySelector(".ttl").textContent = title;
+  $("checks").appendChild(d);
+  return {
+    done(kind, summary, raw){
+      const b = d.querySelector(".badge");
+      b.className = "badge " + kind;
+      b.textContent = kind === "ok" ? "да" : kind === "bad" ? "нет" : "внимание";
+      d.querySelector(".sum").textContent = summary;
+      if (raw !== undefined){
+        const s = typeof raw === "string" ? raw : JSON.stringify(raw, null, 1);
+        const det = document.createElement("details");
+        det.innerHTML = "<summary>ответ Moodle</summary><pre></pre>";
+        det.querySelector("pre").textContent = s.length > 6000 ? s.slice(0, 6000) + "\n… обрезано" : s;
+        d.appendChild(det);
+      }
+      const mark = kind === "ok" ? "[да]  " : kind === "bad" ? "[НЕТ] " : "[!]   ";
+      report.push(mark + title + " — " + summary.replace(/\n/g, "\n      "));
+    }
+  };
+}
+
+const NEEDED = [
+  ["tool_mobile_get_content", "главный путь: через него работают и отметка, и форма преподавателя"],
+  ["tool_mobile_get_autologin_key", "нужен для вращающегося QR: открыть страницу Moodle уже залогиненным"],
+  ["tool_mobile_get_plugins_supporting_mobile", "узнать версию плагина посещаемости"],
+  ["core_enrol_get_users_courses", "список курсов"],
+  ["core_course_get_contents", "найти в курсах элементы «Посещаемость»"]
+];
+
+async function runAll(){
+  $("checks").innerHTML = ""; report = []; modules = [];
+  $("runCard").style.display = ""; $("repCard").style.display = "none";
+  let info = null;
+
+  let r = row("Кто вошёл и какой это Moodle");
+  try{
+    info = await call("core_webservice_get_site_info");
+    r.done("ok", info.fullname + " · " + info.username + " (id " + info.userid + ")\n"
+      + info.sitename + " · Moodle " + (info.release || "?"), info);
+  }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); return finish(); }
+
+  r = row("Функции, доступные этому токену");
+  const have = new Set((info.functions || []).map(f => f.name));
+  const miss = NEEDED.filter(n => !have.has(n[0]));
+  const att = [...have].filter(n => n.indexOf("mod_attendance") === 0);
+  const lines = NEEDED.map(n => (have.has(n[0]) ? "✓ " : "✗ ") + n[0] + " — " + n[1]);
+  lines.push(att.length ? "✓ собственные функции плагина: " + att.join(", ")
+                        : "✗ собственных функций плагина нет (ожидаемо: они не входят в мобильный сервис)");
+  r.done(miss.length ? "bad" : "ok", "всего функций: " + have.size + "\n" + lines.join("\n"));
+
+  r = row("Плагин посещаемости поддерживает приложение Moodle");
+  try{
+    const pl = await call("tool_mobile_get_plugins_supporting_mobile");
+    const a = (pl.plugins || []).filter(p => (p.component || "").indexOf("attendance") >= 0);
+    r.done(a.length ? "ok" : "bad",
+      a.length ? a.map(p => p.component + " · версия " + p.version + " · обработчиков: " + (p.handlers ? p.handlers.length : 0)).join("\n")
+               : "среди " + ((pl.plugins || []).length) + " плагинов посещаемости нет",
+      a.length ? a : pl);
+  }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
+
+  r = row("Курсы и элементы «Посещаемость»");
+  try{
+    const courses = await call("core_enrol_get_users_courses", { userid: info.userid });
+    let scanned = 0;
+    for (const c of courses.slice(0, 20)){
+      try{
+        const cont = await call("core_course_get_contents", { courseid: c.id });
+        scanned++;
+        cont.forEach(sec => (sec.modules || []).forEach(m => {
+          if (m.modname === "attendance")
+            modules.push({ course: c.fullname, courseid: c.id, cmid: m.id, name: m.name });
+        }));
+      }catch(e){}
+    }
+    r.done(modules.length ? "ok" : "bad",
+      "курсов: " + courses.length + ", просмотрено: " + scanned + ", найдено элементов: " + modules.length
+      + (modules.length ? "\n" + modules.map(m => "• " + m.name + " — курс «" + m.course + "», cmid " + m.cmid).join("\n") : ""),
+      modules);
+  }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
+
+  for (const m of modules.slice(0, 3)){
+    r = row("Содержимое «" + m.name + "» через приложение");
+    try{
+      const c = await call("tool_mobile_get_content", {
+        component: "mod_attendance", method: "mobile_view_activity",
+        args: [ { name: "appversioncode", value: 44000 },
+                { name: "cmid", value: m.cmid },
+                { name: "courseid", value: m.courseid } ]
+      });
+      const html = (c.templates || []).map(t => t.html || "").join("\n");
+      const teacher = /takeattendance|selectall|take attendance/i.test(html);
+      const student = /submitattendance|studentpass|submit attendance/i.test(html);
+      const sess = (html.match(/sessid/g) || []).length;
+      r.done("ok",
+        "ответ получен, шаблонов: " + (c.templates || []).length
+        + "\nпохоже на форму преподавателя: " + (teacher ? "да" : "нет")
+        + "\nпохоже на форму студента: " + (student ? "да" : "нет")
+        + "\nупоминаний занятия (sessid): " + sess, c);
+    }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
+  }
+  finish();
+}
+
+function finish(){
+  $("repCard").style.display = "";
+  $("rep").value = "Проверка Moodle (посещаемость), " + new Date().toLocaleString() + "\n"
+    + "====================================================\n" + report.join("\n\n");
+}
+
+$("autologin").onclick = async () => {
+  if (!token){ $("authErr").textContent = "Сначала войдите"; return; }
+  const r = row("Одноразовый ключ входа (для вращающегося QR)");
+  try{
+    const k = await call("tool_mobile_get_autologin_key");
+    r.done("ok", "ключ выдан, адрес входа: " + (k.autologinurl || "—")
+      + "\nповторно Moodle выдаёт его не сразу — это и надо измерить на потоке",
+      { autologinurl: k.autologinurl, key: k.key ? "(скрыт)" : undefined, validuntil: k.validuntil });
+  }catch(e){
+    r.done("warn", "отказ: " + (e.code || "") + " " + e.message);
+  }
+  finish();
+};
+
+$("signin").onclick = async () => {
+  const u = $("u").value.trim(), p = $("p").value;
+  $("authErr").textContent = "";
+  if (!u || !p){ $("authErr").textContent = "Введите логин и пароль"; return; }
+  $("signin").disabled = true; $("signin").textContent = "Вход…";
+  try{
+    token = await login(u, p);
+    $("p").value = "";                 // пароль больше не нужен — стираем сразу же
+    await runAll();
+  }catch(e){ $("authErr").textContent = e.message; }
+  finally{ $("signin").disabled = false; $("signin").textContent = "Войти и проверить"; }
+};
+$("p").onkeydown = e => { if (e.key === "Enter") $("signin").click(); };
+$("again").onclick = () => runAll();
+$("copy").onclick = () => { $("rep").select(); try{ document.execCommand("copy"); }catch(e){} };
+
+try{
+  const saved = localStorage.getItem("ttpu_lms_token");
+  if (saved){
+    $("fromApp").style.display = "";
+    $("useSaved").onclick = () => { token = saved; runAll(); };
+  }
+}catch(e){}
+</script>
+</body>
+</html>

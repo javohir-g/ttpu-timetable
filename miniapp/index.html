@@ -2020,8 +2020,12 @@ function currentCourseOnly(list, courseOf){
    они, открывалось бы не то задание. */
 function homeDueList(f){
   const all=currentCourseOnly((f && f.due) || [], d=>d.course);
-  const pending=all.filter(d=>!d.submitted);
-  return (pending.length ? pending : all).slice(0,6);
+  /* Просроченное на главной не показываем: "Due soon" отвечает на вопрос
+     "что успеть", а не "что уже упущено", и давно пропущенные задания иначе
+     занимали бы собой весь список. На вкладке задач они остаются. */
+  const soon=all.filter(d=>!d.when || d.when*1000 >= Date.now());
+  const pending=soon.filter(d=>!d.submitted);
+  return (pending.length ? pending : soon).slice(0,6);
 }
 /* Строка задания. Балл показываем из максимума: «34 / 50» сразу говорит,
    насколько это много, тогда как одна цифра 34.00 не говорит ничего. Дата

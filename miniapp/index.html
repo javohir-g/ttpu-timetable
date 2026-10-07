@@ -267,17 +267,23 @@
   .list .li.link .v { color: var(--muted); }
 
   /* ================= PROFILE ================= */
-  .logo-card { display: flex; align-items: center; justify-content: center;
-    padding: 18px 16px; margin-bottom: var(--gap); }
-  /* Ширина вдвое меньше исходной: файл всего 251 px, при большем размере он
-     заметно мылится на плотных экранах. */
-  .brand { display: block; width: 170px; max-width: 100%; height: auto; }
+  .brand-wrap { display: flex; justify-content: center; padding: 4px 0 22px; }
+  .brand { display: block; width: 215px; max-width: 72%; height: auto; }
   .brand.dark { display: none; }
   :root[data-theme="dark"] .brand.light { display: none; }
   :root[data-theme="dark"] .brand.dark { display: block; }
-  .prof-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: var(--gap); }
-  .prof-card .pava { width: 54px; height: 54px; border-radius: var(--r-md); background: var(--tint); color: var(--accent); }
-  .prof-card .nm { flex: 1; font-size: 16px; font-weight: 700; }
+  .prof-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: var(--gap); }
+  .prof-card .pava { width: 72px; height: 72px; border-radius: 14px; background: var(--tint);
+    color: var(--accent); font-size: 23px; }
+  .prof-card .nm { flex: 1; min-width: 0; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+  .prof-card .pedit { flex: none; width: 36px; height: 36px; border: none; background: none;
+    color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .prof-card .pedit svg { width: 21px; height: 21px; }
+  /* В макете подпись тёмная, значение серое - в остальных списках наоборот */
+  .prof-list .li .k { color: var(--text); }
+  .prof-list .li .v { color: var(--muted); }
+  /* строки данных и строки настроек разделены так же, как между собой */
+  .prof-list #profList .li:last-child { border-bottom: .5px solid var(--line); }
   /* раньше это была последняя карточка экрана, теперь под ней настройки — нужен общий зазор */
   #profList { margin-bottom: var(--gap); }
   .demo-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
@@ -321,9 +327,6 @@
   .nav button.active lord-icon { --lord-icon-primary: var(--accent); --lord-icon-secondary: var(--accent); }
 
   /* ================= НАСТРОЙКИ ================= */
-  .set-card { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 12px 16px; margin-bottom: var(--gap); }
-  .set-card .k { font-size: 13.5px; color: var(--text2); }
   /* вложенный элемент: радиус 12 как у остальных, у кнопок концентрично 12 − 3 = 9 */
   .seg { display: flex; gap: 2px; background: var(--bg); border-radius: var(--r-md); padding: 3px; }
   .seg button { border: none; background: none; color: var(--muted); font-size: 12.5px; font-weight: 600;
@@ -805,9 +808,10 @@
 <!-- ================= PROFILE ================= -->
 <div id="s-profile" class="screen">
   <div class="pad">
-    <!-- Два файла вместо перекраски фильтром: тёмно-синий логотип на чёрном фоне
+    <!-- Логотип стоит на фоне страницы, а не в карточке: это шапка экрана.
+         Два файла вместо перекраски фильтром: тёмно-синий логотип на чёрном фоне
          не виден, а filter портит сглаживание на мелком тексте. -->
-    <div class="card logo-card">
+    <div class="brand-wrap">
       <img class="brand light" src="logo.png" width="251" height="71"
            alt="Turin Polytechnic University in Tashkent">
       <img class="brand dark" src="logo-dark.png" width="251" height="71" alt="">
@@ -815,22 +819,26 @@
     <div class="card prof-card">
       <div class="pava" id="profAva"></div>
       <div class="nm" id="profName">–</div>
+      <button class="pedit" id="profEdit" aria-label="Change account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4v16h16v-7"/><path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
     </div>
-    <div class="card list" id="profList"></div>
-    <div class="card set-card">
-      <span class="k">Appearance</span>
-      <div class="seg" id="themeSeg">
-        <button data-t="auto">Auto</button>
-        <button data-t="light">Light</button>
-        <button data-t="dark">Dark</button>
+    <!-- Данные и настройки одной карточкой, как в макете -->
+    <div class="card list prof-list">
+      <div id="profList"></div>
+      <div class="li">
+        <span class="k">Appearance</span>
+        <div class="seg" id="themeSeg">
+          <button data-t="auto">Auto</button>
+          <button data-t="light">Light</button>
+          <button data-t="dark">Dark</button>
+        </div>
       </div>
-    </div>
-    <div class="card set-card">
-      <span class="k">Interface size</span>
-      <div class="step">
-        <button id="uiDown" aria-label="Smaller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
-        <span class="val" id="uiVal">100%</span>
-        <button id="uiUp" aria-label="Larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <div class="li">
+        <span class="k">Interface size</span>
+        <div class="step">
+          <button id="uiDown" aria-label="Smaller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+          <span class="val" id="uiVal">100%</span>
+          <button id="uiUp" aria-label="Larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
       </div>
     </div>
     <!-- полный выход: стирает вход в LMS и группу, возвращает на экран входа -->
@@ -2310,6 +2318,9 @@ function logout(){
   showLogin();
 }
 $("logoutBtn").onclick=logout;
+/* Единственное, что в профиле вообще можно сменить, - учётная запись и группа,
+   поэтому карандаш ведёт на экран входа, а не в выдуманные настройки. */
+$("profEdit").onclick=()=>{ haptic(); showLogin(); };
 
 /* ---------- boot ---------- */
 function enterApp(){ $("s-login").classList.remove("active"); $("nav").classList.add("on"); ttSel=todayIndex(); nav("home"); }

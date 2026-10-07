@@ -31,10 +31,16 @@ jobs:
           python-version: "3.12"
 
       # Тянет актуальную неделю с ttpu.edupage.org и перезаписывает miniapp/data.json.
-      # Если edupage недоступен — не валим сборку, публикуем данные из репозитория.
+      # Если edupage недоступен — сайт всё равно публикуем (со старыми данными),
+      # но сборку в конце заваливаем: иначе поломка живёт незамеченной месяцами,
+      # как это и случилось в сентябре. pipefail обязателен — без него код
+      # возврата берётся у tee, и падение python осталось бы «успехом».
       - name: Обновить расписание
+        id: refresh
         continue-on-error: true
-        run: python miniapp/build_data.py
+        run: |
+          set -o pipefail
+          python miniapp/build_data.py 2>&1 | tee refresh.log
 
       # В публикацию кладём только сам сайт, без скрипта сборки
       - name: Собрать папку сайта
@@ -48,9 +54,39 @@ jobs:
           cp miniapp/manifest.json _site/
           cp -r miniapp/icons   _site/
 
+      # Журналы Actions не прочитать без доступа к репозиторию, поэтому кладём
+      # итог рядом с сайтом: по адресу /build-status.json видно, когда была
+      # сборка, обновились ли данные и с какой ошибкой, если нет.
+      - name: Записать статус сборки
+        if: always()
+        env:
+          OUTCOME: ${{ steps.refresh.outcome }}
+        run: |
+          python -c "
+          import json, datetime, os, pathlib
+          d = json.load(open('miniapp/data.json', encoding='utf-8'))
+          log = pathlib.Path('refresh.log')
+          json.dump({
+              'built': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'refresh': os.environ['OUTCOME'],
+              'data_updated': d.get('updated'),
+              'week': d.get('week'),
+              'log': log.read_text(encoding='utf-8', errors='replace')[-2000:] if log.exists() else '',
+          }, open('_site/build-status.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+          "
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      # Последним шагом, уже после публикации: сайт обновлён, но если расписание
+      # собрать не удалось — сборка должна гореть красным и прислать письмо.
+      - name: Сообщить, если расписание не обновилось
+        if: steps.refresh.outcome != 'success'
+        run: |
+          echo "Расписание не обновилось — опубликованы старые данные."
+          cat refresh.log || true
+          exit 1

@@ -395,17 +395,6 @@
     color: var(--muted); padding: 5px 0 5px 12px; }
   .gr-items .it b { color: var(--text2); font-weight: 600; flex: none; }
 
-  /* Шапка оценок - та же схема, что у даты в расписании: крупная цифра слева,
-     быстрое действие справа. Сводка стоит отдельной карточкой, а не внутри
-     списка: сначала "как дела", потом подробности. */
-  .gr-head { display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 18px 16px 20px; margin-bottom: 10px; }
-  .gr-head .dl { display: flex; align-items: center; min-width: 0; }
-  .gr-head .big { font-size: 44px; font-weight: 800; letter-spacing: -1.4px; line-height: .9;
-    font-variant-numeric: tabular-nums; flex: none; }
-  .gr-head .big i { font-style: normal; font-size: 20px; font-weight: 700;
-    color: var(--muted); margin-left: 2px; letter-spacing: 0; }
-  .gr-head .sub { font-size: 13.5px; color: var(--muted); margin-left: 12px; line-height: 1.4; }
   /* полоса курсов: кнопки шире дневных, механика плашки та же */
   .gr-years { margin-bottom: var(--gap); }
   .gr-years .d { width: auto; min-width: 54px; height: 38px; padding: 0 12px; }
@@ -491,9 +480,6 @@
   .task-course-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .task-course-title .n { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
   .task-course-badge { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 3px 9px; border-radius: 100px; flex: none; }
-
-  .task-progress-bar { height: 4px; background: var(--line); border-radius: 100px; margin-top: 6px; overflow: hidden; width: 110px; }
-  .task-progress-fill { height: 100%; background: var(--ok); border-radius: 100px; transition: width .3s ease; }
 
   .task-course-items { display: flex; flex-direction: column; }
 
@@ -789,11 +775,6 @@
     <!-- ===== ПАНЕЛЬ: ЗАДАЧИ ===== -->
     <div class="att-panel on" id="attPanelTasks">
       <div class="pad" style="padding-top:0">
-        <!-- та же шапка, что у оценок: крупная цифра слева, одно действие справа -->
-        <div class="card gr-head">
-          <div class="dl"><span class="big" id="attDueCount">-</span><span class="sub" id="attDueSub"></span></div>
-          <button class="today-pill" id="attFilterBtn">All</button>
-        </div>
         <div class="card week gr-years" id="attYears"><span class="wk-pill" id="attYearPill"></span></div>
         <div class="gr-status" id="attDueStatus"></div>
         <div id="attDueList"></div>
@@ -803,11 +784,6 @@
     <!-- ===== ПАНЕЛЬ: ОЦЕНКИ ===== -->
     <div class="att-panel" id="attPanelGrades">
       <div class="pad" style="padding-top:0">
-        <!-- шапка как у даты в расписании: крупная цифра слева, быстрое действие справа -->
-        <div class="card gr-head">
-          <div class="dl"><span class="big" id="grAvg">—</span><span class="sub" id="grSub"></span></div>
-          <button class="today-pill" id="grRefresh">Refresh</button>
-        </div>
         <!-- полоса курсов: та же скользящая плашка, что у дней недели -->
         <div class="card week gr-years" id="grYears"><span class="wk-pill" id="grYearPill"></span></div>
         <div class="gr-status" id="grStatus"></div>
@@ -1888,7 +1864,10 @@ function courseSection(rawName){
 }
 const ORD=["","1st","2nd","3rd","4th","5th","6th"];
 
-let grYearFilter = "active";
+/* По умолчанию показываем все курсы: отбор по текущему году прятал остальные,
+   и это читалось как «часть курсов пропала». Полоса сверху остаётся для того,
+   кто хочет сузить список сам. */
+let grYearFilter = "all";
 
 function setGrYearFilter(yr){
   grYearFilter = yr;
@@ -1901,7 +1880,6 @@ function paintGrades(g){
   const list=$("grList"), strip=$("grYears");
   strip.querySelectorAll(".d").forEach(n=>n.remove());
   if(!allRows.length){
-    $("grAvg").textContent="\u2014"; $("grSub").innerHTML="No courses";
     list.innerHTML=`<div class="li"><span class="muted">No courses</span></div>`;
     return;
   }
@@ -1918,21 +1896,7 @@ function paintGrades(g){
   const rows = curKey==="all" ? allRows
     : allRows.filter(r=>r.s.key===curKey || (!r.s.key && curKey===activeKey));
 
-  /* Сводка живёт в шапке, а не в списке: сначала "как дела", потом подробности.
-     Среднее считаем только по курсам с процентом - зачёты "Pass" в него не
-     входят, иначе цифра означала бы неизвестно что. */
-  const pctOf=v=>{ const m=/(\d+(?:[.,]\d+)?)\s*%/.exec(String(v||"")); return m?parseFloat(m[1].replace(",",".")):null; };
-  const nums=rows.map(r=>pctOf(r.c.grade)).filter(n=>n!=null);
-  const graded=rows.filter(r=>r.c.grade!=null).length;
-  const avg=nums.length?Math.round(nums.reduce((x,z)=>x+z,0)/nums.length):null;
   const changed=new Set(g.changed||[]);
-  const nNew=rows.filter(r=>changed.has(r.c.id)).length;
-  const secNow=secMap.get(curKey);
-  const title = curKey==="all" ? "All years"
-    : (secNow&&secNow.year ? ORD[secNow.year]+" year" : (secNow&&secNow.code) || "Courses");
-  $("grAvg").innerHTML = avg!=null ? avg+"<i>%</i>" : "\u2014";
-  $("grSub").innerHTML = esc(title)+"<br>"+graded+" of "+rows.length+" graded"
-    + (nNew ? " \u00b7 "+nNew+" new" : "");
   /* Дату показываем, только если данные залежались: в обычный день это лишняя
      строка, а "обновлено три дня назад" уже стоит заметить. */
   const ageD = g.updated ? (Date.now()-g.updated)/86400000 : 0;
@@ -1953,8 +1917,8 @@ function paintGrades(g){
 
   let html="";
   if(curKey==="all"){
-    /* Заголовки разделов нужны только здесь: в остальных случаях курс уже
-       выбран полосой сверху, и повторять его в списке незачем. */
+    /* Разделы по курсам: с ними список из трёх десятков предметов читается,
+       без них это сплошная лента. При выборе одного курса они не нужны. */
     const order=[], byKey=new Map();
     rows.forEach(r=>{ const k=r.s.key;
       if(!byKey.has(k)){ byKey.set(k,[]); order.push(k); }
@@ -2112,7 +2076,6 @@ $("lgBtn").onclick=async ()=>{
 };
 $("lgPass").onkeydown=e=>{ if(e.key==="Enter") $("lgBtn").click(); };
 $("grSignIn").onclick=()=>{ haptic(); showLogin(); };
-$("grRefresh").onclick=()=>{ haptic(); refreshGrades(false); };
 
 /* ---------- ATTENDANCE: таббар ---------- */
 let attTab = "tasks";   // текущий активный таб
@@ -2134,15 +2097,9 @@ function switchAttTab(tab){
   if(tab === "grades" && lmsToken) renderGrades();
 }
 [...document.querySelectorAll(".att-tab")].forEach(b => b.onclick = () => { haptic(); switchAttTab(b.dataset.tab); });
-/* Фильтр одной кнопкой по кругу: отдельный ряд из трёх кнопок занимал строку
-   экрана ради выбора, который делают редко. */
-$("attFilterBtn").onclick = () => { haptic();
-  attTaskFilter = attTaskFilter==="all" ? "pending" : attTaskFilter==="pending" ? "done" : "all";
-  renderAttTasks();
-};
 
-let attYearFilter = "active";
-let attTaskFilter = "all";
+
+let attYearFilter = "all";
 
 function getActiveYearKey(sections){
   const a = admitYear();
@@ -2168,8 +2125,6 @@ function renderAttTasks(){
   const due=(feed && feed.due) || [];
   const list=$("attDueList");
   if(!due.length){
-    $("attDueCount").textContent="0";
-    $("attDueSub").innerHTML="Tasks<br>"+esc((feed && feed.note) || "nothing found");
     $("attTasksBadge").textContent="";
     $("attYears").querySelectorAll(".d").forEach(n=>n.remove());
     list.innerHTML=`<div class="card list"><div class="li"><span class="muted">`
@@ -2190,24 +2145,10 @@ function renderAttTasks(){
     const sec=courseSection(x.d.course);
     return sec.key===curKey || (!sec.key && curKey===activeKey);
   });
-  const doneN=inYear.filter(x=>x.d.submitted).length;
-  const pending=inYear.length-doneN;
-  const secNow=secMap.get(curKey);
-  const title = curKey==="all" ? "All years"
-    : (secNow && secNow.year ? ORD[secNow.year]+" year" : "Current");
-
-  /* Крупная цифра — то, ради чего экран открывают: сколько ещё не сдано.
-     Фильтр переехал в кнопку справа, как "Today" в расписании: один ряд
-     управления вместо двух. */
-  $("attDueCount").textContent=String(pending);
-  $("attDueSub").innerHTML=esc(title)+"<br>"+pending+" to do "+"\u00b7 "+doneN+" done";
+  const pending=inYear.filter(x=>!x.d.submitted).length;
   $("attTasksBadge").textContent = pending ? String(pending) : (inYear.length ? "\u2713" : "");
-  $("attFilterBtn").textContent = attTaskFilter==="pending" ? "To do"
-    : attTaskFilter==="done" ? "Done" : "All";
 
-  const items=inYear.filter(x=>
-    attTaskFilter==="pending" ? !x.d.submitted
-    : attTaskFilter==="done" ? x.d.submitted : true);
+  const items=inYear;
   if(!items.length){
     list.innerHTML=`<div class="card list"><div class="li"><span class="muted">Nothing in this filter</span></div></div>`;
     return;
@@ -2223,10 +2164,8 @@ function renderAttTasks(){
   let html="";
   bySubj.forEach((arr,name)=>{
     const done=arr.filter(x=>x.d.submitted).length;
-    const pct=Math.round(done/arr.length*100);
     html += `<div class="task-course-card">`
-          + `<div class="task-course-title"><div><span class="n">${esc(name)}</span>`
-          + `<div class="task-progress-bar"><div class="task-progress-fill" style="width:${pct}%"></div></div></div>`
+          + `<div class="task-course-title"><span class="n">${esc(name)}</span>`
           + `<span class="task-course-badge">${done}/${arr.length}</span></div>`
           + `<div class="task-course-items">`;
     arr.forEach(x=>{

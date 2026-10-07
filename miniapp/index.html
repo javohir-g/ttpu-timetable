@@ -395,6 +395,40 @@
     color: var(--muted); padding: 5px 0 5px 12px; }
   .gr-items .it b { color: var(--text2); font-weight: 600; flex: none; }
 
+  /* ================= АТТ-ТАББАР ================= */
+  /* Два таба сверху страницы оценок/задач. Та же техника скользящей плашки,
+     что и у выбора дня в расписании — единый визуальный язык приложения. */
+  .att-tabs { position: sticky; top: var(--safe-top); z-index: 5;
+    background: var(--bg); padding: 8px var(--pad-x) var(--gap); }
+  .att-seg { display: flex; gap: 2px; background: var(--card); border-radius: var(--r-lg);
+    padding: 4px; position: relative; }
+  .att-pill { position: absolute; left: 4px; top: 4px; z-index: 0;
+    background: var(--accent); border-radius: calc(var(--r-lg) - 4px);
+    pointer-events: none;
+    transition: transform .3s cubic-bezier(.32,1.25,.4,1), width .3s cubic-bezier(.32,1.25,.4,1); }
+  .att-tab { position: relative; z-index: 1; flex: 1; border: none; background: none;
+    font-family: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
+    padding: 9px 8px; border-radius: calc(var(--r-lg) - 4px); cursor: pointer;
+    transition: color .22s ease; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .att-tab.sel { color: #fff; }
+  .att-tab .badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.28);
+    padding: 1px 6px; border-radius: 100px; font-variant-numeric: tabular-nums; }
+  .att-tab:not(.sel) .badge { background: var(--tint); color: var(--accent); }
+  /* панели содержимого */
+  .att-panel { display: none; }
+  .att-panel.on { display: block; }
+  /* список задач на экране att: те же стили .due, но все задания, а не только первые 6 */
+  #attDueList .due { margin: 0 var(--pad-x); }
+  #attDueList .due-det { margin: 0 var(--pad-x); }
+
+  /* Предупреждение о застоявшихся данных. Расписание собирается в фоне раз
+     в несколько часов; если сборка сломается, пользователь не должен узнавать
+     об этом по неправильным парам. Цвет — предупреждающий, но не тревожный. */
+  .stale { display: none; margin: 0 0 var(--gap); padding: 9px 12px;
+    border-radius: var(--r-md); background: rgba(255,149,0,.16); color: var(--warn);
+    font-size: 12.5px; line-height: 1.35; }
+  .stale.on { display: block; }
+
   /* ================= ПОЛОСА ПОД ВЫРЕЗОМ ЭКРАНА ================= */
   /* padding у body резервирует место под статус-бар только до первой прокрутки:
      он часть документа и уезжает вместе с ним, после чего контент рисуется под
@@ -422,7 +456,35 @@
   .due .lft.d-today { color: var(--warn);   background: rgba(255,149,0,.16); }
   .due .lft.d-soon  { color: var(--accent); background: var(--tint); }
   .due .lft.d-far   { color: var(--muted);  background: var(--bg); }
+  .due .lft.d-ok    { color: var(--ok);     background: rgba(52,199,89,.16); }
   .due .mid { flex: 1; min-width: 0; }
+
+  /* ================= ГРУППИРОВКА, ФИЛЬТРЫ И ГОДА ================= */
+  .year-switcher { display: flex; gap: 6px; overflow-x: auto; margin: 0 var(--pad-x) 12px var(--pad-x);
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .year-switcher::-webkit-scrollbar { display: none; }
+  .y-btn { padding: 6px 13px; border-radius: 100px; font-size: 12px; font-weight: 600;
+    background: var(--card); color: var(--muted); border: 1px solid var(--line);
+    cursor: pointer; white-space: nowrap; transition: all .18s ease; flex: none; }
+  .y-btn.sel { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,122,255,0.25); }
+
+  .task-filters { display: flex; gap: 8px; margin: 0 var(--pad-x) 14px var(--pad-x); }
+  .t-flt { flex: 1; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; transition: all .18s ease; }
+  .t-flt.sel { background: var(--tint); color: var(--accent); border-color: var(--tint); }
+
+  .task-course-card { background: var(--card); border-radius: 14px; margin: 0 var(--pad-x) 12px var(--pad-x); padding: 14px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); border: 1px solid var(--line); }
+  .task-course-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .task-course-title .n { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
+  .task-course-badge { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 3px 9px; border-radius: 100px; flex: none; }
+
+  .task-progress-bar { height: 4px; background: var(--line); border-radius: 100px; margin-top: 6px; overflow: hidden; width: 110px; }
+  .task-progress-fill { height: 100%; background: var(--ok); border-radius: 100px; transition: width .3s ease; }
+
+  .task-course-items { display: flex; flex-direction: column; }
+
+  .due-det-inner { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin: 6px 0 8px 0; font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; }
+  .due-note { color: var(--text2); background: var(--tint); padding: 6px 10px; border-radius: 6px; margin-top: 4px; font-size: 11.5px; }
   /* display: block обязателен — это span'ы, иначе название и предмет встают в одну строку */
   .due .mid .n { display: block; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .due .mid .c { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -572,13 +634,21 @@
      с текущей, — то есть один раз у каждого. Стоит до чтений ниже: иначе тема
      и масштаб успеют подхватиться из старых значений. Облачные ключи Telegram
      чистит основной скрипт — здесь их ещё нет. */
-  var RESET_ID="2026-09-15";
+  var RESET_ID="2026-09-15";     // полный сброс: вход, профиль, тема, масштаб
+  var CACHE_ID="2026-10-08";     // только кеши LMS, когда у них меняется формат
   try{
     if(localStorage.getItem("ttpu_reset")!==RESET_ID){
-      ["ttpu_profile","ttpu_theme","ttpu_ui","ttpu_data","ttpu_lms_token","ttpu_grades"]
+      ["ttpu_profile","ttpu_theme","ttpu_ui","ttpu_data","ttpu_lms_token","ttpu_grades","ttpu_feed"]
         .forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
       localStorage.setItem("ttpu_reset",RESET_ID);
       window.__ttpuReset=true;   // сигнал основному скрипту: почистить ещё и облако
+    }
+    /* Лента заданий и оценки теперь хранятся иначе: старые записи сломали бы
+       отрисовку. Но вход и профиль при этом ни при чём — выкидывать всех из
+       приложения ради смены формата кеша нельзя. */
+    if(localStorage.getItem("ttpu_cache")!==CACHE_ID){
+      ["ttpu_feed","ttpu_grades"].forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+      localStorage.setItem("ttpu_cache",CACHE_ID);
     }
   }catch(e){}
 
@@ -661,6 +731,7 @@
     </div>
     <div class="card week" id="ttWeek"><span class="wk-pill" id="ttPill"></span></div>
     </div>
+    <div class="stale" id="ttStale"></div>
     <div class="card tl-card" id="ttBody"></div>
     <!-- десктоп: вся неделя сеткой вместо одного дня с листанием -->
     <div class="tt-wide" id="ttWide">
@@ -673,21 +744,48 @@
 
 <!-- ================= ATTENDANCE ================= -->
 <div id="s-att" class="screen">
-  <div class="pad">
-    <!-- вход в LMS: виден, пока нет токена -->
+
+  <!-- вход в LMS: виден, пока нет токена -->
+  <div class="pad" id="grLoginWrap">
     <div class="card gr-prompt" id="grLogin">
-      <h2>Grades</h2>
-      <p>Sign in with your edu.turin.uz account to see your courses and grades.</p>
+      <h2>Tasks &amp; Grades</h2>
+      <p>Sign in with your edu.turin.uz account to see deadlines, submitted work, and your course grades.</p>
       <button class="btn" id="grSignIn">Sign in</button>
       <div class="gr-err" id="grErr"></div>
     </div>
+  </div>
 
-    <!-- оценки: видны, когда токен есть. Имя не показываем — вход в приложение
-         и так выполняется под конкретным пользователем в самом начале. -->
-    <div id="grView" style="display:none">
-      <div class="gr-status" id="grStatus"></div>
-      <div class="card list" id="grList"></div>
+  <!-- контент после входа -->
+  <div id="grView" style="display:none">
+
+    <!-- ===== ТАББАР ===== -->
+    <div class="att-tabs">
+      <div class="att-seg" id="attSeg">
+        <span class="att-pill" id="attPill"></span>
+        <button class="att-tab sel" id="attTabTasks" data-tab="tasks">
+          Tasks
+          <span class="badge" id="attTasksBadge"></span>
+        </button>
+        <button class="att-tab" id="attTabGrades" data-tab="grades">
+          Grades
+        </button>
+      </div>
     </div>
+
+    <!-- ===== ПАНЕЛЬ: ЗАДАЧИ ===== -->
+    <div class="att-panel on" id="attPanelTasks">
+      <div class="gr-status" id="attDueStatus"></div>
+      <div id="attDueList"></div>
+    </div>
+
+    <!-- ===== ПАНЕЛЬ: ОЦЕНКИ ===== -->
+    <div class="att-panel" id="attPanelGrades">
+      <div class="gr-status" id="grStatus"></div>
+      <div class="pad" style="padding-top:0;padding-bottom:0">
+        <div class="card list" id="grList"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1099,7 +1197,19 @@ $("ttWideBtn").onclick=()=>{ ttWk = ttWk?0:1; if(!ttWk) ttSel=todayIndex(); hapt
 // смена ширины окна на лету: пересобираем открытое расписание
 WIDE_Q.addEventListener("change",()=>{ if($("s-tt").classList.contains("active")) renderTT(); });
 
+/* Трое суток: сборка обновляет данные раз в шесть часов, так что столько они
+   стоят либо при сломанной сборке, либо когда телефон давно без сети. И то,
+   и другое пользователю стоит знать — пары могли смениться. */
+function paintStale(){
+  const el=$("ttStale"); if(!el) return;
+  const m=/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(DATA.updated||"");
+  const t=m?Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]):0;
+  const days=t?Math.floor((Date.now()-t)/86400000):0;
+  el.classList.toggle("on", days>3);
+  if(days>3) el.textContent="Timetable data is "+days+" days old — lessons may have changed since";
+}
 function renderTT(){
+  paintStale();
   if(isWide()){ renderTTGrid(); return; }
   // направление перехода: вперёд по неделе — карточки приезжают справа, назад — слева
   const first = ttPrev===null;
@@ -1309,7 +1419,13 @@ async function lmsLogin(user,pass){
   return j.token;
 }
 async function lmsCall(fn,params){
-  const body=new URLSearchParams(Object.assign({wstoken:lmsToken,wsfunction:fn,moodlewsrestformat:"json"},params||{}));
+  /* Moodle ждёт вложенные параметры плоскими: options[timestart], а не options
+     целиком. Без разворачивания объект уходил строкой "[object Object]", и
+     запрос календаря молча падал — ошибку глотал try/catch вызывающего. */
+  const body=new URLSearchParams();
+  const add=(k,v)=>{ if(v&&typeof v==="object") Object.entries(v).forEach(([kk,vv])=>add(k+"["+kk+"]",vv)); else body.append(k,v); };
+  Object.entries({wstoken:lmsToken,wsfunction:fn,moodlewsrestformat:"json"}).forEach(([k,v])=>add(k,v));
+  Object.entries(params||{}).forEach(([k,v])=>add(k,v));
   const r=await fetch(LMS+"/webservice/rest/server.php",{method:"POST",body});
   const j=await r.json();
   if(j && j.exception){ const e=new Error(j.message||j.errorcode||"LMS error"); e.code=j.errorcode; throw e; }
@@ -1365,7 +1481,9 @@ function saveFeed(f){ feed=f||null;
 /* Округляем к ближайшему, а не вниз: floor превращал двое суток в «1d», а пять
    часов в «4h» — то есть занижал остаток времени именно там, где ошибка дороже
    всего. Порог 24 проверяем по уже округлённым часам, иначе появилось бы «24h». */
-function dueLabel(ts){
+function dueLabel(ts, submitted){
+  if(submitted) return { t:"Done", c:"d-ok" };
+  if(!ts) return { t:"No date", c:"d-far" };
   const ms=ts*1000-Date.now();
   if(ms<0) return { t:"Late", c:"d-over" };
   const m=Math.round(ms/60000);
@@ -1375,17 +1493,121 @@ function dueLabel(ts){
   const d=Math.max(1,Math.round(ms/86400000));
   return { t:d+"d", c: d<3 ? "d-soon" : "d-far" };
 }
-async function lmsDeadlines(){
-  // немного назад по времени — чтобы просроченное, но не сданное, тоже попало
-  const from=Math.floor(Date.now()/1000) - 14*86400;
-  const r=await lmsCall("core_calendar_get_action_events_by_timesort",{ timesortfrom:from, limitnum:20 });
-  return ((r&&r.events)||[]).map(e=>({
-    name: e.name || e.activityname || "Task",
-    course: (e.course && (e.course.fullname || e.course.shortname)) || "",
-    when: e.timesort || 0,
-    mod: e.modulename || "",
-    inst: e.instance || 0
-  })).filter(x=>x.when).sort((a,b)=>a.when-b.when).slice(0,6);
+async function lmsDeadlines(fns){
+  const events = [];
+  const seenMap = new Map();
+
+  // 1. Полноценный забор всех заданий из зарегистрированных курсов через mod_assign_get_assignments
+  if(!fns || fns.has("mod_assign_get_assignments")){
+    try{
+      const res = await lmsCall("mod_assign_get_assignments");
+      if(res && res.courses && Array.isArray(res.courses)){
+        res.courses.forEach(c => {
+          const courseName = c.fullname || c.shortname || ("Course " + c.id);
+          (c.assignments || []).forEach(a => {
+            const when = a.duedate || a.cutoffdate || a.allowsubmissionsfromdate || 0;
+            const key = "assign:" + a.id;
+            const item = {
+              name: a.name || "Assignment",
+              course: courseName,
+              when: when,
+              mod: "assign",
+              inst: a.id
+            };
+            seenMap.set(key, item);
+            events.push(item);
+          });
+        });
+      }
+    }catch(e){}
+  }
+
+  // 2. Все события из календаря Moodle (включая уже сданные и завершённые)
+  if(!fns || fns.has("core_calendar_get_calendar_events")){
+    try{
+      const from = Math.floor(Date.now()/1000) - 180*86400;
+      const to   = Math.floor(Date.now()/1000) + 180*86400;
+      const r = await lmsCall("core_calendar_get_calendar_events", {
+        options: { timestart: from, timeend: to }
+      });
+      if(r && r.events && Array.isArray(r.events)){
+        r.events.forEach(e => {
+          const mod = e.modulename || "";
+          const inst = e.instance || e.id || 0;
+          const key = (mod||"event") + ":" + inst;
+          if(!seenMap.has(key)){
+            const item = {
+              name: e.name || e.activityname || "Task",
+              course: e.coursename || (e.course && (e.course.fullname || e.course.shortname)) || "",
+              when: e.timestart || e.timesort || 0,
+              mod: mod,
+              inst: inst
+            };
+            seenMap.set(key, item);
+            events.push(item);
+          }
+        });
+      }
+    }catch(e){}
+  }
+
+  // 3. Активные события из календаря
+  if(!fns || fns.has("core_calendar_get_action_events_by_timesort")){
+    try{
+      const from = Math.floor(Date.now()/1000) - 180*86400;
+      const to   = Math.floor(Date.now()/1000) + 180*86400;
+      const r = await lmsCall("core_calendar_get_action_events_by_timesort",
+        { timesortfrom: from, timesortto: to, limitnum: 200 });
+      if(r && r.events && Array.isArray(r.events)){
+        r.events.forEach(e => {
+          const mod = e.modulename || "";
+          const inst = e.instance || e.id || 0;
+          const key = mod + ":" + inst;
+          if(!seenMap.has(key)){
+            const item = {
+              name: e.name || e.activityname || "Task",
+              course: (e.course && (e.course.fullname || e.course.shortname)) || "",
+              when: e.timesort || 0,
+              mod: mod,
+              inst: inst
+            };
+            seenMap.set(key, item);
+            events.push(item);
+          } else {
+            const existing = seenMap.get(key);
+            if(!existing.when && e.timesort) existing.when = e.timesort;
+          }
+        });
+      }
+    }catch(e){}
+  }
+
+  /* Статус сдачи — отдельный запрос на каждое задание, поэтому идём пулом
+     в шесть потоков. Promise.all по всему списку открывал разом десятки
+     соединений к серверу университета: с телефона это не быстрее, а дольше,
+     и нагрузка на чужой сервер ничем не оправдана. */
+  const assignTasks = events.filter(e => e.mod === "assign" && e.inst);
+  let nextTask = 0;
+  async function fetchStatuses(){
+    while(nextTask < assignTasks.length){
+      const task = assignTasks[nextTask++];
+      try{
+        const sub = await lmsSubmission(task.inst);
+        task.submitted = sub.submitted;
+        task.subStatus = sub.status;
+        task.grade     = sub.grade;
+        task.note      = sub.note;
+      }catch(e){}
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, assignTasks.length) }, fetchStatuses));
+
+  return events.sort((a,b) => {
+    if(!a.when && !b.when) return 0;
+    if(!a.when) return 1;
+    if(!b.when) return -1;
+    return a.when - b.when;
+  });
 }
 async function lmsSubmission(assignid){
   const r=await lmsCall("mod_assign_get_submission_status",{assignid});
@@ -1418,14 +1640,17 @@ const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const DOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>';
 
 function paintFeed(f){
-  const due=f.due||[];
+  const allDue = f.due || [];
+  const pending = allDue.filter(d => !d.submitted);
+  const due = (pending.length ? pending : allDue).slice(0,6);
   $("homeDue").innerHTML = due.length
     ? due.map((d,i)=>{
-        const L=dueLabel(d.when);
+        const L=dueLabel(d.when, d.submitted);
+        const isOk=!!d.submitted;
         return `<div class="due" data-d="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
              + `<span class="mid"><span class="n">${esc(prettySubject(d.name))}</span>`
              + `<span class="c">${esc(prettySubject(d.course))}</span></span>`
-             + `<span class="st" data-st="${i}">${DOT_SVG}</span></div>`
+             + `<span class="st ${isOk?'ok':''}" data-st="${i}">${isOk ? CHECK_SVG : DOT_SVG}</span></div>`
              + `<div class="due-det" data-det="${i}"></div>`;
       }).join("")
     : `<div class="due-none">${esc(f.note || "Nothing due — you are clear")}</div>`;
@@ -1438,29 +1663,22 @@ function paintFeed(f){
         + `<span class="v ${gradeClass(r.pct||r.grade)}">${esc(r.grade)}</span></div>`).join("")
     : `<div class="due-none">No graded work yet</div>`;
 }
-/* Раскрытие строки: запрашиваем статус сдачи только здесь и только один раз. */
+/* Раскрытие строки на главной */
 async function toggleDue(i){
   const box=$("homeDue").querySelector(`.due-det[data-det="${i}"]`);
   if(!box) return;
   haptic();
   if(box.classList.contains("on")){ box.classList.remove("on"); return; }
   box.classList.add("on");
-  const d=(feed&&feed.due||[])[i]; if(!d) return;
-  const when=new Date(d.when*1000).toLocaleString();
-  if(box.dataset.done){ return; }
-  box.innerHTML=`${esc(when)}`;
-  if(d.mod!=="assign" || !d.inst){ box.dataset.done="1"; return; }
-  try{
-    const s=await lmsSubmission(d.inst);
-    box.dataset.done="1";
-    const st = s.submitted ? "Submitted" : (s.status==="draft" ? "Draft — not submitted" : "Not submitted");
-    box.innerHTML = `${esc(when)}<br>${esc(st)}`
-      + (s.grade ? `<br>Grade: ${esc(s.grade)}` : "")
-      + (s.note ? `<br>${esc(s.note.slice(0,160))}` : "");
-    if(s.submitted){ const m=$("homeDue").querySelector(`.st[data-st="${i}"]`); if(m){ m.classList.add("ok"); m.innerHTML=CHECK_SVG; } }
-  }catch(e){
-    box.innerHTML=`${esc(when)}<br>${esc(e.message||"Could not load status")}`;
-  }
+  const allDue = (feed && feed.due) || [];
+  const pending = allDue.filter(d => !d.submitted);
+  const due = (pending.length ? pending : allDue).slice(0,6);
+  const d = due[i]; if(!d) return;
+  const when = d.when ? new Date(d.when*1000).toLocaleString() : "No deadline set";
+  const st = d.submitted ? "Submitted" : (d.subStatus === "draft" ? "Draft — not submitted" : (d.subStatus || "Not submitted"));
+  box.innerHTML = `${esc(when)}<br>Status: <b>${esc(st)}</b>`
+    + (d.grade ? `<br>Grade: ${esc(d.grade)}` : "")
+    + (d.note ? `<br>${esc(d.note.slice(0,160))}` : "");
 }
 function renderHomeFeed(){
   const on=!!lmsToken;
@@ -1473,26 +1691,36 @@ function renderHomeFeed(){
 async function refreshFeed(quiet){
   if(feedBusy || !lmsToken) return;
   feedBusy=true;
-  if(!quiet) $("homeDue").innerHTML=`<div class="due-none">Loading…</div>`;
+  if(!quiet){
+    $("homeDue").innerHTML=`<div class="due-none">Loading…</div>`;
+    if($("attDueList")) $("attDueList").innerHTML=`<div class="li"><span class="muted">Loading…</span></div>`;
+  }
   try{
     const info=await lmsCall("core_webservice_get_site_info");
     const uid=info.userid;
-    // site_info перечисляет разрешённые функции — если нужной нет, честно пишем об этом,
-    // иначе пустая карточка выглядела бы как «заданий нет»
     const fns=new Set((info.functions||[]).map(x=>x.name));
     const f={ updated:Date.now(), due:[], recent:[], note:"" };
-    if(fns.has("core_calendar_get_action_events_by_timesort")){
-      try{ f.due=await lmsDeadlines(); }catch(e){ f.note="Deadlines unavailable: "+(e.code||e.message||"error"); }
-    } else f.note="Deadlines: calendar function not open for this account";
+    try{
+      f.due=await lmsDeadlines(fns);
+    }catch(e){
+      f.note="Deadlines unavailable: "+(e.code||e.message||"error");
+    }
     let courses=[];
     try{ courses=(await lmsCall("core_enrol_get_users_courses",{userid:uid}))||[]; }catch(e){}
     try{
       f.recent=await lmsRecent(courses.map(c=>({id:c.id,name:c.fullname||c.shortname||("Course "+c.id)})),uid);
     }catch(e){}
-    saveFeed(f); paintFeed(f);
+    saveFeed(f);
+    paintFeed(f);
+    if(typeof renderAttTasks === "function") renderAttTasks();
   }catch(e){
-    if(feed) paintFeed(feed);
-    else $("homeDue").innerHTML=`<div class="due-none">${esc(e.message||"Could not load")}</div>`;
+    if(feed){
+      paintFeed(feed);
+      if(typeof renderAttTasks === "function") renderAttTasks();
+    } else {
+      $("homeDue").innerHTML=`<div class="due-none">${esc(e.message||"Could not load")}</div>`;
+      if($("attDueList")) $("attDueList").innerHTML=`<div class="li"><span class="muted">${esc(e.message||"Could not load")}</span></div>`;
+    }
   } finally { feedBusy=false; }
 }
 
@@ -1622,19 +1850,60 @@ function courseSection(rawName){
 }
 const ORD=["","1st","2nd","3rd","4th","5th","6th"];
 
+let grYearFilter = "active";
+
+function setGrYearFilter(yr){
+  grYearFilter = yr;
+  haptic();
+  if(grades) paintGrades(grades);
+}
+
 function paintGrades(g){
-  // дата обновления переехала в строку статуса — отдельной шапки больше нет
   setGrStatus(g.updated ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
-  const rows=(g.courses||[]).map((c,i)=>({ c, i, s:courseSection(c.name) }));
-  if(!rows.length){ $("grList").innerHTML=`<div class="li"><span class="muted">No courses</span></div>`; return; }
+  const allRows=(g.courses||[]).map((c,i)=>({ c, i, s:courseSection(c.name) }));
+  if(!allRows.length){ $("grList").innerHTML=`<div class="li"><span class="muted">No courses</span></div>`; return; }
+
+  const allSectionsMap = new Map();
+  allRows.forEach(r => { if(!allSectionsMap.has(r.s.key)) allSectionsMap.set(r.s.key, r.s); });
+  const allSections = [...allSectionsMap.values()];
+  const activeKey = getActiveYearKey(allSections);
+
+  let html = "";
+  if(allSections.length > 1 || activeKey){
+    html += `<div class="year-switcher">`;
+    const isActSel = (grYearFilter === "active");
+    const activeSec = allSectionsMap.get(activeKey);
+    const activeLabel = activeSec && activeSec.year ? ORD[activeSec.year] + " year (Current)" : "Current year";
+
+    html += `<button type="button" class="y-btn ${isActSel?'sel':''}" onclick="setGrYearFilter('active')">★ ${esc(activeLabel)}</button>`;
+    html += `<button type="button" class="y-btn ${grYearFilter==='all'?'sel':''}" onclick="setGrYearFilter('all')">All years</button>`;
+
+    const sortedSecs = allSections.filter(s=>s.key && s.key!==activeKey).sort((a,b)=>(a.year&&b.year)?a.year-b.year:0);
+    sortedSecs.forEach(sec => {
+      const label = sec.year ? ORD[sec.year] + " year" : (sec.code || "Other");
+      const isSel = (grYearFilter === sec.key);
+      html += `<button type="button" class="y-btn ${isSel?'sel':''}" onclick="setGrYearFilter('${esc(sec.key)}')">${esc(label)}</button>`;
+    });
+    html += `</div>`;
+  }
+
+  const rows = allRows.filter(r => {
+    if(grYearFilter === "active") return !activeKey || r.s.key === activeKey || !r.s.key;
+    if(grYearFilter === "all") return true;
+    return r.s.key === grYearFilter;
+  });
+
+  if(!rows.length){
+    html += `<div class="li"><span class="muted">No courses for this year</span></div>`;
+    $("grList").innerHTML = html;
+    return;
+  }
 
   const order=[], byKey=new Map();
   rows.forEach(r=>{ const k=r.s.key;
     if(!byKey.has(k)){ byKey.set(k,[]); order.push(k); }
     byKey.get(k).push(r); });
-  // один раздел — заголовок ни о чём не сообщает, показываем плоский список
   const grouped = byKey.size>1;
-  // курсы по возрастанию номера, затем разделы по коду в порядке Moodle, без кода — в конец
   order.sort((a,b)=>{
     const ra=byKey.get(a)[0].s, rb=byKey.get(b)[0].s;
     if(ra.year && rb.year) return ra.year-rb.year;
@@ -1651,7 +1920,7 @@ function paintGrades(g){
          + `<span class="v ${gradeClass(r.c.grade)}">${esc(txt)}</span></div>`
          + `<div class="gr-items" data-items="${r.i}"></div>`;
   };
-  let html="";
+
   order.forEach(k=>{
     const list=byKey.get(k);
     if(grouped){
@@ -1753,10 +2022,210 @@ $("lgBtn").onclick=async ()=>{
 $("lgPass").onkeydown=e=>{ if(e.key==="Enter") $("lgBtn").click(); };
 $("grSignIn").onclick=()=>{ haptic(); showLogin(); };
 
-/* ---------- ATTENDANCE ---------- */
-/* На экране остались только оценки: выдуманная посещаемость убрана вместе
-   с её разметкой, иначе обращения к удалённым элементам роняли бы экран. */
-function renderAtt(){ renderGrades(); }
+/* ---------- ATTENDANCE: таббар ---------- */
+let attTab = "tasks";   // текущий активный таб
+
+function attMovePill(){
+  const seg = $("attSeg"), pill = $("attPill");
+  const btn = seg.querySelector(".att-tab.sel");
+  if(!btn||!pill) return;
+  pill.style.width  = btn.offsetWidth  + "px";
+  pill.style.height = btn.offsetHeight + "px";
+  pill.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
+}
+function switchAttTab(tab){
+  attTab = tab;
+  [...document.querySelectorAll(".att-tab")].forEach(b => b.classList.toggle("sel", b.dataset.tab === tab));
+  $("attPanelTasks").classList.toggle("on", tab === "tasks");
+  $("attPanelGrades").classList.toggle("on", tab === "grades");
+  requestAnimationFrame(attMovePill);
+  if(tab === "grades" && lmsToken) renderGrades();
+}
+[...document.querySelectorAll(".att-tab")].forEach(b => b.onclick = () => { haptic(); switchAttTab(b.dataset.tab); });
+
+let attYearFilter = "active";
+let attTaskFilter = "all";
+
+function getActiveYearKey(sections){
+  const a = admitYear();
+  if(a !== null){
+    const nowYr = new Date().getFullYear() % 100;
+    const curY = nowYr - a + 1;
+    const key = "y" + curY;
+    if(sections.some(s => s.key === key)) return key;
+  }
+  let maxNum = 0, maxKey = "";
+  sections.forEach(s => {
+    if(s.year && s.year > maxNum){
+      maxNum = s.year;
+      maxKey = s.key;
+    }
+  });
+  if(maxKey) return maxKey;
+  return sections[0] ? sections[0].key : "";
+}
+
+function renderAttTasks(){
+  const hasLms = !!lmsToken;
+  if(!hasLms) return;
+  const f = feed;
+  const due = (f && f.due) || [];
+
+  if(!due.length){
+    $("attDueList").innerHTML = `<div class="card list" style="margin:0 var(--pad-x);padding:20px;text-align:center;"><span class="muted">${esc(f && f.note ? f.note : "No tasks found")}</span></div>`;
+    $("attTasksBadge").textContent = "";
+    return;
+  }
+
+  // 1. Все доступные секции по годам
+  const allSectionsMap = new Map();
+  due.forEach(d => {
+    const sec = courseSection(d.course);
+    if(!allSectionsMap.has(sec.key)) allSectionsMap.set(sec.key, sec);
+  });
+  const allSections = [...allSectionsMap.values()];
+  const activeKey = getActiveYearKey(allSections);
+
+  let html = "";
+
+  // Переключатель годов (по умолчанию — актуальный год)
+  if(allSections.length > 1 || activeKey){
+    html += `<div class="year-switcher">`;
+    const isActSel = (attYearFilter === "active");
+    const activeSec = allSectionsMap.get(activeKey);
+    const activeLabel = activeSec && activeSec.year ? ORD[activeSec.year] + " year (Current)" : "Current year";
+
+    html += `<button type="button" class="y-btn ${isActSel?'sel':''}" onclick="setYearFilter('active')">★ ${esc(activeLabel)}</button>`;
+    html += `<button type="button" class="y-btn ${attYearFilter==='all'?'sel':''}" onclick="setYearFilter('all')">All years</button>`;
+
+    const sortedSecs = allSections.filter(s=>s.key && s.key!==activeKey).sort((a,b)=>(a.year&&b.year)?a.year-b.year:0);
+    sortedSecs.forEach(sec => {
+      const label = sec.year ? ORD[sec.year] + " year" : (sec.code || "Other");
+      const isSel = (attYearFilter === sec.key);
+      html += `<button type="button" class="y-btn ${isSel?'sel':''}" onclick="setYearFilter('${esc(sec.key)}')">${esc(label)}</button>`;
+    });
+    html += `</div>`;
+  }
+
+  // Фильтрация по году
+  const yearFiltered = due.map((d, origIdx) => ({ d, origIdx })).filter(x => {
+    if(attYearFilter === "active"){
+      const sec = courseSection(x.d.course);
+      return !activeKey || sec.key === activeKey || !sec.key;
+    }
+    if(attYearFilter === "all") return true;
+    const sec = courseSection(x.d.course);
+    return sec.key === attYearFilter;
+  });
+
+  const totalAll = yearFiltered.length;
+  const totalDone = yearFiltered.filter(x => x.d.submitted).length;
+  const totalPending = totalAll - totalDone;
+
+  $("attTasksBadge").textContent = totalPending ? String(totalPending) : (totalAll ? "✓" : "");
+
+  // 2. Фильтры статуса (All / Pending / Done)
+  html += `<div class="task-filters">`
+    + `<button type="button" class="t-flt ${attTaskFilter==='all'?'sel':''}" onclick="setTaskFilter('all')">All (${totalAll})</button>`
+    + `<button type="button" class="t-flt ${attTaskFilter==='pending'?'sel':''}" onclick="setTaskFilter('pending')">Pending (${totalPending})</button>`
+    + `<button type="button" class="t-flt ${attTaskFilter==='done'?'sel':''}" onclick="setTaskFilter('done')">Done (${totalDone})</button>`
+    + `</div>`;
+
+  const finalItems = yearFiltered.filter(x => {
+    if(attTaskFilter === "pending") return !x.d.submitted;
+    if(attTaskFilter === "done") return x.d.submitted;
+    return true;
+  });
+
+  if(!finalItems.length){
+    html += `<div class="card list" style="margin:0 var(--pad-x);padding:20px;text-align:center;"><div class="due-none">No tasks in this filter</div></div>`;
+    $("attDueList").innerHTML = html;
+    return;
+  }
+
+  // 3. Группировка по предмету
+  const subjectMap = new Map();
+  finalItems.forEach(item => {
+    const subjName = prettySubject(item.d.course) || "Other Course";
+    if(!subjectMap.has(subjName)) subjectMap.set(subjName, []);
+    subjectMap.get(subjName).push(item);
+  });
+
+  subjectMap.forEach((items, subjName) => {
+    const doneCount = items.filter(x => x.d.submitted).length;
+    const pct = Math.round((doneCount / items.length) * 100);
+    const statusText = (doneCount === items.length) ? '✓ Completed' : `${items.length - doneCount} due`;
+
+    html += `<div class="task-course-card">`
+          + `<div class="task-course-title">`
+          + `  <div>`
+          + `    <span class="n">${esc(subjName)}</span>`
+          + `    <div class="task-progress-bar"><div class="task-progress-fill" style="width:${pct}%"></div></div>`
+          + `  </div>`
+          + `  <span class="task-course-badge">${doneCount}/${items.length} done · ${statusText}</span>`
+          + `</div>`
+          + `<div class="task-course-items">`;
+
+    items.forEach(x => {
+      const d = x.d;
+      const i = x.origIdx;
+      const L = dueLabel(d.when, d.submitted);
+      const isOk = !!d.submitted;
+      html += `<div class="due" data-att="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
+            + `<span class="mid"><span class="n">${esc(d.name)}</span></span>`
+            + `<span class="st ${isOk ? 'ok' : ''}" data-attst="${i}">${isOk ? CHECK_SVG : DOT_SVG}</span></div>`
+            + `<div class="due-det" data-attdet="${i}"></div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  $("attDueList").innerHTML = html;
+  [...$("attDueList").querySelectorAll(".due")].forEach(r => r.onclick = () => toggleAttDue(+r.dataset.att));
+}
+
+function setYearFilter(yr){
+  attYearFilter = yr;
+  haptic();
+  renderAttTasks();
+}
+
+function setTaskFilter(flt){
+  attTaskFilter = flt;
+  haptic();
+  renderAttTasks();
+}
+
+function toggleAttDue(i){
+  const box = $("attDueList").querySelector(`.due-det[data-attdet="${i}"]`);
+  if(!box) return;
+  haptic();
+  if(box.classList.contains("on")){ box.classList.remove("on"); return; }
+  box.classList.add("on");
+  const d = (feed && feed.due || [])[i]; if(!d) return;
+  const when = d.when ? new Date(d.when*1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "No deadline set";
+  const stText = d.submitted ? "Submitted ✓" : (d.subStatus === "draft" ? "Draft (not submitted)" : "Not submitted");
+  const stClass = d.submitted ? "g-hi" : "g-low";
+
+  box.innerHTML = `<div class="due-det-inner">`
+    + `<div>📅 <b>Due:</b> ${esc(when)}</div>`
+    + `<div>📌 <b>Status:</b> <span class="${stClass}">${esc(stText)}</span></div>`
+    + (d.grade ? `<div>💯 <b>Grade:</b> <b class="${gradeClass(d.grade)}">${esc(d.grade)}</b></div>` : "")
+    + (d.note  ? `<div class="due-note">💬 ${esc(d.note.slice(0,200))}</div>` : "")
+    + `</div>`;
+}
+
+function renderAtt(){
+  const hasLms = !!lmsToken;
+  $("grLoginWrap").style.display = hasLms ? "none" : "";
+  $("grView").style.display      = hasLms ? ""     : "none";
+  if(!hasLms) return;
+  // загружаем/обновляем ленту задач если нужно
+  if(navigator.onLine && (!feed || Date.now() - (feed.updated||0) > GR_MAX_AGE)) refreshFeed(!!feed);
+  renderAttTasks();
+  requestAnimationFrame(attMovePill);
+  if(attTab === "grades") renderGrades();
+}
 
 /* ---------- PROFILE ---------- */
 function renderProfile(){

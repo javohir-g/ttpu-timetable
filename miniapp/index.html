@@ -775,7 +775,6 @@
     <!-- ===== ПАНЕЛЬ: ЗАДАЧИ ===== -->
     <div class="att-panel on" id="attPanelTasks">
       <div class="pad" style="padding-top:0">
-        <div class="card week gr-years" id="attYears"><span class="wk-pill" id="attYearPill"></span></div>
         <div class="gr-status" id="attDueStatus"></div>
         <div id="attDueList"></div>
       </div>
@@ -2134,7 +2133,6 @@ function switchAttTab(tab){
 [...document.querySelectorAll(".att-tab")].forEach(b => b.onclick = () => { haptic(); switchAttTab(b.dataset.tab); });
 
 
-let attYearFilter = "all";
 
 function getActiveYearKey(sections){
   const a = admitYear();
@@ -2161,25 +2159,25 @@ function renderAttTasks(){
   const list=$("attDueList");
   if(!due.length){
     $("attTasksBadge").textContent="";
-    $("attYears").querySelectorAll(".d").forEach(n=>n.remove());
     list.innerHTML=`<div class="card list"><div class="li"><span class="muted">`
       + esc((feed && feed.note) || "No tasks found") + `</span></div></div>`;
     return;
   }
 
+  /* Задачи показываем только за текущий курс: задания прошлых лет давно сданы
+     или просрочены, и в списке дел им делать нечего. Выбор года здесь поэтому
+     не нужен - в отличие от оценок, куда заглядывают за прошлые семестры. */
   const secMap=new Map();
   due.forEach(d=>{ const sec=courseSection(d.course); if(!secMap.has(sec.key)) secMap.set(sec.key,sec); });
   const activeKey=getActiveYearKey([...secMap.values()]);
-  const curKey = attYearFilter==="active" ? activeKey : attYearFilter;
-  buildYearStrip("attYears", [...secMap.values()], curKey, activeKey,
-    k=>{ attYearFilter=k; renderAttTasks(); });
-  requestAnimationFrame(()=>movePillIn("attYears","attYearPill"));
-
-  const inYear = due.map((d,origIdx)=>({ d, origIdx })).filter(x=>{
-    if(curKey==="all") return true;
+  const all = due.map((d,origIdx)=>({ d, origIdx }));
+  let inYear = all.filter(x=>{
     const sec=courseSection(x.d.course);
-    return sec.key===curKey || (!sec.key && curKey===activeKey);
+    return sec.key===activeKey || !sec.key;
   });
+  /* Если текущий курс не определился - показываем всё, а не пустой экран:
+     пустой список выглядел бы как "заданий нет", что было бы неправдой. */
+  if(!inYear.length) inYear = all;
   const pending=inYear.filter(x=>!x.d.submitted).length;
   $("attTasksBadge").textContent = pending ? String(pending) : (inYear.length ? "\u2713" : "");
 

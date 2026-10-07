@@ -200,6 +200,37 @@ async function runAll(){
       a.length ? a : pl);
   }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
 
+  /* Откуда берутся курсы. Экран оценок показывает список из
+     core_enrol_get_users_courses, и если Moodle отдаёт там не всё (прошлые
+     годы, скрытые курсы), часть предметов до приложения просто не доедет.
+     Сравниваем с ведомостью оценок и со списком дашборда. */
+  r = row("Все курсы, которые видит токен");
+  try{
+    const A = await call("core_enrol_get_users_courses", { userid: info.userid });
+    const idsA = new Set(A.map(c => c.id));
+    let B = [], Bextra = [], C = [], Cextra = [], errB = "", errC = "";
+    try{
+      const ov = await call("gradereport_overview_get_course_grades", { userid: info.userid });
+      B = (ov.grades || []).map(x => x.courseid);
+      Bextra = B.filter(id => !idsA.has(id));
+    }catch(e){ errB = (e.code || "") + " " + e.message; }
+    try{
+      const t = await call("core_course_get_enrolled_courses_by_timeline_classification",
+        { classification: "all", limit: 0, offset: 0 });
+      C = (t.courses || []).map(c => ({ id: c.id, name: c.fullname || c.shortname || ("id " + c.id) }));
+      Cextra = C.filter(c => !idsA.has(c.id));
+    }catch(e){ errC = (e.code || "") + " " + e.message; }
+    const names = A.map(c => "• " + (c.fullname || c.shortname || ("id " + c.id)));
+    r.done(Bextra.length || Cextra.length ? "warn" : "ok",
+      "core_enrol_get_users_courses: " + A.length + " курсов"
+      + "\ngradereport_overview: " + (errB ? "отказ " + errB : B.length + ", из них вне первого списка: " + Bextra.length)
+      + (Bextra.length ? " (id " + Bextra.join(", ") + ")" : "")
+      + "\ntimeline (all): " + (errC ? "отказ " + errC : C.length + ", из них вне первого списка: " + Cextra.length)
+      + (Cextra.length ? "\n" + Cextra.slice(0, 20).map(c => "• " + c.name + " (id " + c.id + ")").join("\n") : "")
+      + "\n--- что сейчас видит приложение ---\n" + names.join("\n"),
+      { enrol: A.length, overviewExtra: Bextra, timelineExtra: Cextra });
+  }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
+
   r = row("Курсы и элементы «Посещаемость»");
   try{
     const courses = await call("core_enrol_get_users_courses", { userid: info.userid });
@@ -253,7 +284,7 @@ async function runAll(){
 
 function finish(){
   $("repCard").style.display = "";
-  $("rep").value = "Проверка Moodle (посещаемость), отчёт v2, " + new Date().toLocaleString() + "\n"
+  $("rep").value = "Проверка Moodle, отчёт v3, " + new Date().toLocaleString() + "\n"
     + "====================================================\n" + report.join("\n\n");
 }
 

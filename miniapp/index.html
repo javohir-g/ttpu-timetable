@@ -1441,20 +1441,55 @@ async function lmsCall(fn,params){
 async function lmsLoadGrades(){
   const info=await lmsCall("core_webservice_get_site_info");
   const uid=info.userid;
-  // site_info заодно перечисляет разрешённые функции — обзорную зовём, только если она есть
+  // site_info заодно перечисляет разрешённые функции — лишние не зовём
   const fns=new Set((info.functions||[]).map(f=>f.name));
-  const courses=await lmsCall("core_enrol_get_users_courses",{userid:uid});
+
+  /* Список курсов собираем из нескольких источников. core_enrol_get_users_courses
+     отдаёт только действующие записи на курс: прошлогодние и скрытые предметы
+     в него не попадают, и именно поэтому часть курсов не доезжала до экрана.
+     Ведомость оценок и список дашборда знают о них, поэтому берём объединение. */
+  const byId=new Map();
+  const add=(id,name)=>{
+    if(id==null) return;
+    const have=byId.get(id);
+    if(!have) byId.set(id,{ id, name: name || ("Course "+id) });
+    else if(name && have.name==="Course "+id) have.name=name;   // имя пришло позже
+  };
+
+  try{
+    (await lmsCall("core_enrol_get_users_courses",{userid:uid})||[])
+      .forEach(c=>add(c.id, c.fullname||c.shortname));
+  }catch(e){}
+
+  if(fns.has("core_course_get_enrolled_courses_by_timeline_classification")){
+    try{
+      const t=await lmsCall("core_course_get_enrolled_courses_by_timeline_classification",
+        { classification:"all", limit:0, offset:0 });
+      (t.courses||[]).forEach(c=>add(c.id, c.fullname||c.shortname));
+    }catch(e){}
+  }
+
   const overview={};
   if(fns.has("gradereport_overview_get_course_grades")){
     try{
       const ov=await lmsCall("gradereport_overview_get_course_grades",{userid:uid});
-      (ov.grades||[]).forEach(g=>{ overview[g.courseid]=g.grade; });
+      (ov.grades||[]).forEach(g=>{ overview[g.courseid]=g.grade; add(g.courseid,null); });
     }catch(e){}   // обзор необязателен: без него оценка курса подтянется при раскрытии
   }
+
+  /* Курсы, которые нашлись только в ведомости, приходят без названия. */
+  const unnamed=[...byId.values()].filter(c=>c.name==="Course "+c.id).map(c=>c.id);
+  if(unnamed.length && fns.has("core_course_get_courses_by_field")){
+    try{
+      const r=await lmsCall("core_course_get_courses_by_field",{ field:"ids", value:unnamed.join(",") });
+      (r.courses||[]).forEach(c=>{ const x=byId.get(c.id); if(x) x.name=c.fullname||c.shortname||x.name; });
+    }catch(e){}
+  }
+
   return { uid, user: info.fullname||"", updated: Date.now(),
-    courses: (courses||[]).map(c=>({
+    courses: [...byId.values()].map(c=>({
       id: c.id,
-      name: c.fullname || c.shortname || ("Course "+c.id),
+      name: c.name,
       grade: (overview[c.id]===undefined || overview[c.id]==="-") ? null : overview[c.id]
     })) };
 }

@@ -255,7 +255,8 @@
   .list .sec-hd { display: flex; align-items: baseline; gap: 8px; padding: 13px 0 6px;
     border-bottom: .5px solid var(--line); }
   .list .sec-hd:first-child { padding-top: 5px; }
-  .list .sec-hd .t { font-size: 12px; font-weight: 700; color: var(--text2); }
+  .list .sec-hd .t { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--text2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list .sec-hd .c { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list .li { display: flex; justify-content: space-between; align-items: center; padding: 11px 0;
     border-bottom: .5px solid var(--line); font-size: 13.5px; }
@@ -476,13 +477,6 @@
 
   /* Полоса курсов и фильтр в шапке заменили россыпь чипсов: на экране остаётся
      один ряд управления вместо двух, и язык тот же, что на остальных страницах. */
-  .task-course-card { background: var(--card); border-radius: 14px; margin: 0 0 12px; padding: 14px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); border: 1px solid var(--line); }
-  .task-course-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .task-course-title .n { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
-  .task-course-badge { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 3px 9px; border-radius: 100px; flex: none; }
-
-  .task-course-items { display: flex; flex-direction: column; }
-
   .due-det-inner { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin: 6px 0 8px 0; font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; }
   .due-note { color: var(--text2); background: var(--tint); padding: 6px 10px; border-radius: 6px; margin-top: 4px; font-size: 11.5px; }
   /* display: block обязателен — это span'ы, иначе название и предмет встают в одну строку */
@@ -2206,13 +2200,16 @@ function renderAttTasks(){
     bySubj.get(n).push(x);
   });
 
-  let html="";
+  /* Одна карточка с разделами по предметам - ровно как список оценок. Раньше
+     каждый предмет был отдельной карточкой со своим радиусом, рамкой и тенью,
+     каких больше нигде в приложении нет. */
+  let html='<div class="card list">';
   bySubj.forEach((arr,name)=>{
     const done=arr.filter(x=>x.d.submitted).length;
-    html += `<div class="task-course-card">`
-          + `<div class="task-course-title"><span class="n">${esc(name)}</span>`
-          + `<span class="task-course-badge">${done}/${arr.length}</span></div>`
-          + `<div class="task-course-items">`;
+    // несданное выше сданного, внутри - по сроку: сверху то, чем заняться
+    arr.sort((x,z)=>(x.d.submitted?1:0)-(z.d.submitted?1:0) || (x.d.when||1e12)-(z.d.when||1e12));
+    html += `<div class="sec-hd"><span class="t">${esc(name)}</span>`
+          + `<span class="c">${done}/${arr.length}</span></div>`;
     arr.forEach(x=>{
       const d=x.d, i=x.origIdx, L=dueLabel(d.when, d.submitted), ok=!!d.submitted;
       html += `<div class="due" data-att="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
@@ -2220,8 +2217,8 @@ function renderAttTasks(){
             + `<span class="st ${ok?"ok":""}" data-attst="${i}">${ok?CHECK_SVG:DOT_SVG}</span></div>`
             + `<div class="due-det" data-attdet="${i}"></div>`;
     });
-    html += `</div></div>`;
   });
+  html += '</div>';
   list.innerHTML=html;
   [...list.querySelectorAll(".due")].forEach(r=>{ r.onclick=()=>toggleAttDue(+r.dataset.att); });
 }

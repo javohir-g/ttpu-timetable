@@ -395,6 +395,32 @@
     color: var(--muted); padding: 5px 0 5px 12px; }
   .gr-items .it b { color: var(--text2); font-weight: 600; flex: none; }
 
+  /* Шапка оценок - та же схема, что у даты в расписании: крупная цифра слева,
+     быстрое действие справа. Сводка стоит отдельной карточкой, а не внутри
+     списка: сначала "как дела", потом подробности. */
+  .gr-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px 16px 20px; margin-bottom: 10px; }
+  .gr-head .dl { display: flex; align-items: center; min-width: 0; }
+  .gr-head .big { font-size: 44px; font-weight: 800; letter-spacing: -1.4px; line-height: .9;
+    font-variant-numeric: tabular-nums; flex: none; }
+  .gr-head .big i { font-style: normal; font-size: 20px; font-weight: 700;
+    color: var(--muted); margin-left: 2px; letter-spacing: 0; }
+  .gr-head .sub { font-size: 13.5px; color: var(--muted); margin-left: 12px; line-height: 1.4; }
+  /* полоса курсов: кнопки шире дневных, механика плашки та же */
+  .gr-years { margin-bottom: var(--gap); }
+  .gr-years .d { width: auto; min-width: 54px; height: 38px; padding: 0 12px; }
+  .gr-years .d .dn { font-size: 14px; }
+  .gr-years .d.today:not(.sel) .dn { color: var(--accent); }
+  /* курс, у которого оценка изменилась с прошлого обновления */
+  .gr-row.fresh .k::after { content: "new"; margin-left: 7px; font-size: 10px; font-weight: 700;
+    color: var(--accent); background: var(--tint); padding: 1px 6px; border-radius: 100px;
+    vertical-align: middle; }
+  /* строка задания: слева название и дата оценки, справа балл */
+  .gr-items .it .n { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .gr-items .it .n i { font-style: normal; font-size: 10.5px; color: var(--muted); opacity: .8; }
+  .gr-items .fb { font-size: 11.5px; color: var(--text2); background: var(--tint);
+    border-radius: 8px; padding: 6px 9px; margin: 0 0 7px 12px; line-height: 1.4; }
+
   /* ================= АТТ-ТАББАР ================= */
   /* Два таба сверху страницы оценок/задач. Та же техника скользящей плашки,
      что и у выбора дня в расписании — единый визуальный язык приложения. */
@@ -418,8 +444,8 @@
   .att-panel { display: none; }
   .att-panel.on { display: block; }
   /* список задач на экране att: те же стили .due, но все задания, а не только первые 6 */
-  #attDueList .due { margin: 0 var(--pad-x); }
-  #attDueList .due-det { margin: 0 var(--pad-x); }
+  #attDueList .due { margin: 0; }
+  #attDueList .due-det { margin: 0; }
 
   /* Предупреждение о застоявшихся данных. Расписание собирается в фоне раз
      в несколько часов; если сборка сломается, пользователь не должен узнавать
@@ -459,21 +485,9 @@
   .due .lft.d-ok    { color: var(--ok);     background: rgba(52,199,89,.16); }
   .due .mid { flex: 1; min-width: 0; }
 
-  /* ================= ГРУППИРОВКА, ФИЛЬТРЫ И ГОДА ================= */
-  .year-switcher { display: flex; gap: 6px; overflow-x: auto; margin: 0 var(--pad-x) 12px var(--pad-x);
-    padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .year-switcher::-webkit-scrollbar { display: none; }
-  .y-btn { padding: 6px 13px; border-radius: 100px; font-size: 12px; font-weight: 600;
-    background: var(--card); color: var(--muted); border: 1px solid var(--line);
-    cursor: pointer; white-space: nowrap; transition: all .18s ease; flex: none; }
-  .y-btn.sel { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,122,255,0.25); }
-
-  .task-filters { display: flex; gap: 8px; margin: 0 var(--pad-x) 14px var(--pad-x); }
-  .t-flt { flex: 1; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
-    border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; transition: all .18s ease; }
-  .t-flt.sel { background: var(--tint); color: var(--accent); border-color: var(--tint); }
-
-  .task-course-card { background: var(--card); border-radius: 14px; margin: 0 var(--pad-x) 12px var(--pad-x); padding: 14px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); border: 1px solid var(--line); }
+  /* Полоса курсов и фильтр в шапке заменили россыпь чипсов: на экране остаётся
+     один ряд управления вместо двух, и язык тот же, что на остальных страницах. */
+  .task-course-card { background: var(--card); border-radius: 14px; margin: 0 0 12px; padding: 14px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); border: 1px solid var(--line); }
   .task-course-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .task-course-title .n { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
   .task-course-badge { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 3px 9px; border-radius: 100px; flex: none; }
@@ -774,16 +788,32 @@
 
     <!-- ===== ПАНЕЛЬ: ЗАДАЧИ ===== -->
     <div class="att-panel on" id="attPanelTasks">
-      <div class="gr-status" id="attDueStatus"></div>
-      <div id="attDueList"></div>
+      <div class="pad" style="padding-top:0">
+        <!-- та же шапка, что у оценок: крупная цифра слева, одно действие справа -->
+        <div class="card gr-head">
+          <div class="dl"><span class="big" id="attDueCount">-</span><span class="sub" id="attDueSub"></span></div>
+          <button class="today-pill" id="attFilterBtn">All</button>
+        </div>
+        <div class="card week gr-years" id="attYears"><span class="wk-pill" id="attYearPill"></span></div>
+        <div class="gr-status" id="attDueStatus"></div>
+        <div id="attDueList"></div>
+      </div>
     </div>
 
     <!-- ===== ПАНЕЛЬ: ОЦЕНКИ ===== -->
     <div class="att-panel" id="attPanelGrades">
-      <div class="gr-status" id="grStatus"></div>
-      <div class="pad" style="padding-top:0;padding-bottom:0">
+      <div class="pad" style="padding-top:0">
+        <!-- шапка как у даты в расписании: крупная цифра слева, быстрое действие справа -->
+        <div class="card gr-head">
+          <div class="dl"><span class="big" id="grAvg">—</span><span class="sub" id="grSub"></span></div>
+          <button class="today-pill" id="grRefresh">Refresh</button>
+        </div>
+        <!-- полоса курсов: та же скользящая плашка, что у дней недели -->
+        <div class="card week gr-years" id="grYears"><span class="wk-pill" id="grYearPill"></span></div>
+        <div class="gr-status" id="grStatus"></div>
         <div class="card list" id="grList"></div>
       </div>
+    </div>
     </div>
 
   </div>
@@ -1463,7 +1493,11 @@ async function lmsCourseItems(courseid,uid){
     pct: it.percentageformatted && it.percentageformatted!=="-" ? it.percentageformatted : "",
     mod: it.itemmodule || "",
     when: it.gradedategraded || 0,
-    raw: (it.graderaw===undefined ? null : it.graderaw)
+    raw: (it.graderaw===undefined ? null : it.graderaw),
+    max: (it.grademax===undefined ? null : it.grademax),
+    // комментарий приходит разметкой: вытаскиваем текст, ради него и открывают ведомость
+    fb: String(it.feedback||"").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ")
+          .replace(/\s+/g," ").trim().slice(0,400)
   })).filter(x=>x.name);
 }
 
@@ -1812,6 +1846,10 @@ async function refreshGrades(quiet){
     // Имя приходит в том же ответе Moodle. Подхватываем его здесь: при входе
     // запрос имени необязателен и мог не пройти, а ещё в Moodle его могли сменить.
     if(g.user && profile && profile.who!==g.user){ profile.who=g.user; saveProfile(profile); }
+    /* Что изменилось с прошлого обновления — сравниваем до записи нового кеша.
+       На первом заходе не помечаем ничего: иначе «новым» оказался бы весь список. */
+    const prev=new Map((((grades&&grades.courses)||[])).map(c=>[c.id,c.grade]));
+    g.changed = prev.size ? g.courses.filter(c=>c.grade!=null && prev.has(c.id) && prev.get(c.id)!==c.grade).map(c=>c.id) : [];
     lmsSaveGrades(g); paintGrades(g);   // статус выставит сама paintGrades
   }catch(e){
     if(e.code==="invalidtoken" || e.code==="accessexception"){
@@ -1859,84 +1897,138 @@ function setGrYearFilter(yr){
 }
 
 function paintGrades(g){
-  setGrStatus(g.updated ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
   const allRows=(g.courses||[]).map((c,i)=>({ c, i, s:courseSection(c.name) }));
-  if(!allRows.length){ $("grList").innerHTML=`<div class="li"><span class="muted">No courses</span></div>`; return; }
-
-  const allSectionsMap = new Map();
-  allRows.forEach(r => { if(!allSectionsMap.has(r.s.key)) allSectionsMap.set(r.s.key, r.s); });
-  const allSections = [...allSectionsMap.values()];
-  const activeKey = getActiveYearKey(allSections);
-
-  let html = "";
-  if(allSections.length > 1 || activeKey){
-    html += `<div class="year-switcher">`;
-    const isActSel = (grYearFilter === "active");
-    const activeSec = allSectionsMap.get(activeKey);
-    const activeLabel = activeSec && activeSec.year ? ORD[activeSec.year] + " year (Current)" : "Current year";
-
-    html += `<button type="button" class="y-btn ${isActSel?'sel':''}" onclick="setGrYearFilter('active')">★ ${esc(activeLabel)}</button>`;
-    html += `<button type="button" class="y-btn ${grYearFilter==='all'?'sel':''}" onclick="setGrYearFilter('all')">All years</button>`;
-
-    const sortedSecs = allSections.filter(s=>s.key && s.key!==activeKey).sort((a,b)=>(a.year&&b.year)?a.year-b.year:0);
-    sortedSecs.forEach(sec => {
-      const label = sec.year ? ORD[sec.year] + " year" : (sec.code || "Other");
-      const isSel = (grYearFilter === sec.key);
-      html += `<button type="button" class="y-btn ${isSel?'sel':''}" onclick="setGrYearFilter('${esc(sec.key)}')">${esc(label)}</button>`;
-    });
-    html += `</div>`;
-  }
-
-  const rows = allRows.filter(r => {
-    if(grYearFilter === "active") return !activeKey || r.s.key === activeKey || !r.s.key;
-    if(grYearFilter === "all") return true;
-    return r.s.key === grYearFilter;
-  });
-
-  if(!rows.length){
-    html += `<div class="li"><span class="muted">No courses for this year</span></div>`;
-    $("grList").innerHTML = html;
+  const list=$("grList"), strip=$("grYears");
+  strip.querySelectorAll(".d").forEach(n=>n.remove());
+  if(!allRows.length){
+    $("grAvg").textContent="\u2014"; $("grSub").innerHTML="No courses";
+    list.innerHTML=`<div class="li"><span class="muted">No courses</span></div>`;
     return;
   }
 
-  const order=[], byKey=new Map();
-  rows.forEach(r=>{ const k=r.s.key;
-    if(!byKey.has(k)){ byKey.set(k,[]); order.push(k); }
-    byKey.get(k).push(r); });
-  const grouped = byKey.size>1;
-  order.sort((a,b)=>{
-    const ra=byKey.get(a)[0].s, rb=byKey.get(b)[0].s;
-    if(ra.year && rb.year) return ra.year-rb.year;
-    if(ra.year) return -1;
-    if(rb.year) return 1;
-    if(!a) return 1;
-    if(!b) return -1;
-    return 0;
-  });
+  const secMap=new Map();
+  allRows.forEach(r=>{ if(!secMap.has(r.s.key)) secMap.set(r.s.key,r.s); });
+  const activeKey=getActiveYearKey([...secMap.values()]);
+  const curKey = grYearFilter==="active" ? activeKey : grYearFilter;
+
+  buildYearStrip("grYears", [...secMap.values()], curKey, activeKey,
+    k=>{ grYearFilter=k; paintGrades(g); });
+  requestAnimationFrame(moveYearPill);
+
+  const rows = curKey==="all" ? allRows
+    : allRows.filter(r=>r.s.key===curKey || (!r.s.key && curKey===activeKey));
+
+  /* Сводка живёт в шапке, а не в списке: сначала "как дела", потом подробности.
+     Среднее считаем только по курсам с процентом - зачёты "Pass" в него не
+     входят, иначе цифра означала бы неизвестно что. */
+  const pctOf=v=>{ const m=/(\d+(?:[.,]\d+)?)\s*%/.exec(String(v||"")); return m?parseFloat(m[1].replace(",",".")):null; };
+  const nums=rows.map(r=>pctOf(r.c.grade)).filter(n=>n!=null);
+  const graded=rows.filter(r=>r.c.grade!=null).length;
+  const avg=nums.length?Math.round(nums.reduce((x,z)=>x+z,0)/nums.length):null;
+  const changed=new Set(g.changed||[]);
+  const nNew=rows.filter(r=>changed.has(r.c.id)).length;
+  const secNow=secMap.get(curKey);
+  const title = curKey==="all" ? "All years"
+    : (secNow&&secNow.year ? ORD[secNow.year]+" year" : (secNow&&secNow.code) || "Courses");
+  $("grAvg").innerHTML = avg!=null ? avg+"<i>%</i>" : "\u2014";
+  $("grSub").innerHTML = esc(title)+"<br>"+graded+" of "+rows.length+" graded"
+    + (nNew ? " \u00b7 "+nNew+" new" : "");
+  /* Дату показываем, только если данные залежались: в обычный день это лишняя
+     строка, а "обновлено три дня назад" уже стоит заметить. */
+  const ageD = g.updated ? (Date.now()-g.updated)/86400000 : 0;
+  setGrStatus(ageD >= 1 ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
+
+  if(!rows.length){
+    list.innerHTML=`<div class="li"><span class="muted">No courses for this year</span></div>`;
+    return;
+  }
 
   const row=r=>{
-    const txt = r.c.grade==null ? "—" : String(r.c.grade);
-    return `<div class="li gr-row" data-i="${r.i}"><span class="k">${esc(prettySubject(r.c.name))}</span>`
+    const txt = r.c.grade==null ? "\u2014" : String(r.c.grade);
+    const fresh = changed.has(r.c.id) ? " fresh" : "";
+    return `<div class="li gr-row${fresh}" data-i="${r.i}"><span class="k">${esc(prettySubject(r.c.name))}</span>`
          + `<span class="v ${gradeClass(r.c.grade)}">${esc(txt)}</span></div>`
          + `<div class="gr-items" data-items="${r.i}"></div>`;
   };
 
-  order.forEach(k=>{
-    const list=byKey.get(k);
-    if(grouped){
-      const s=list[0].s;
-      const codes=[...new Set(list.map(r=>r.s.code).filter(Boolean))].join(", ");
-      const title = s.year ? ORD[s.year]+" year" : (s.code || "Other");
-      html += `<div class="sec-hd"><span class="t">${esc(title)}</span>`
-            + (s.year && codes ? `<span class="c">${esc(codes)}</span>` : "")
-            + `</div>`;
-    }
-    html += list.map(row).join("");
+  let html="";
+  if(curKey==="all"){
+    /* Заголовки разделов нужны только здесь: в остальных случаях курс уже
+       выбран полосой сверху, и повторять его в списке незачем. */
+    const order=[], byKey=new Map();
+    rows.forEach(r=>{ const k=r.s.key;
+      if(!byKey.has(k)){ byKey.set(k,[]); order.push(k); }
+      byKey.get(k).push(r); });
+    order.sort((x,z)=>{
+      const rx=byKey.get(x)[0].s, rz=byKey.get(z)[0].s;
+      if(rx.year && rz.year) return rx.year-rz.year;
+      if(rx.year) return -1;
+      if(rz.year) return 1;
+      return 0;
+    });
+    order.forEach(k=>{
+      const l=byKey.get(k), s=l[0].s;
+      const codes=[...new Set(l.map(r=>r.s.code).filter(Boolean))].join(", ");
+      const t = s.year ? ORD[s.year]+" year" : (s.code || "Other");
+      html += `<div class="sec-hd"><span class="t">${esc(t)}</span>`
+            + (s.year && codes ? `<span class="c">${esc(codes)}</span>` : "") + `</div>`;
+      html += l.map(row).join("");
+    });
+  } else {
+    html = rows.map(row).join("");
+  }
+  list.innerHTML=html;
+  [...list.querySelectorAll(".gr-row")].forEach(r=>{ r.onclick=()=>toggleCourse(+r.dataset.i); });
+}
+/* Полоса курсов: кнопки лет плюс "All" в конце. Одна на обе вкладки, чтобы
+   выбор года выглядел и вёл себя одинаково. */
+function buildYearStrip(stripId, sections, curKey, activeKey, onPick){
+  const strip=$(stripId);
+  strip.querySelectorAll(".d").forEach(n=>n.remove());
+  const years=sections.filter(x=>x.key)
+    .sort((x,z)=>(x.year&&z.year)?x.year-z.year:0)
+    .map(x=>({ key:x.key, label:x.year?ORD[x.year]:(x.code||"-") }));
+  years.push({ key:"all", label:"All" });
+  years.forEach(y=>{
+    const el=document.createElement("button");
+    el.className=["d","yr", y.key===curKey?"sel":"", y.key===activeKey?"today":""].filter(Boolean).join(" ");
+    el.innerHTML=`<span class="dn">${esc(y.label)}</span>`;
+    el.onclick=()=>{ haptic(); onPick(y.key); };
+    strip.appendChild(el);
   });
-  $("grList").innerHTML = html;
-  [...$("grList").querySelectorAll(".gr-row")].forEach(r=>{
-    r.onclick=()=>toggleCourse(+r.dataset.i);
-  });
+}
+/* Плашка выбранного курса - ровно как у дней недели, одна на обе вкладки. */
+function movePillIn(stripId, pillId){
+  const strip=$(stripId); if(!strip) return;
+  const sel=strip.querySelector(".d.sel"), pill=$(pillId);
+  if(!sel||!pill) return;
+  pill.style.width=sel.offsetWidth+"px";
+  pill.style.height=sel.offsetHeight+"px";
+  pill.style.transform=`translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
+}
+function moveYearPill(){ movePillIn("grYears","grYearPill"); }
+/* Строка задания. Балл показываем из максимума: «34 / 50» сразу говорит,
+   насколько это много, тогда как одна цифра 34.00 не говорит ничего. Дата
+   отвечает на «когда проверили», комментарий преподавателя — на «почему
+   столько»; и то, и другое Moodle отдаёт, а мы раньше выбрасывали. */
+function agoLabel(ts){
+  const d=Math.floor((Date.now()-ts*1000)/86400000);
+  if(!ts || d<0) return "";
+  if(d===0) return "graded today";
+  if(d===1) return "graded yesterday";
+  if(d<30) return "graded "+d+" days ago";
+  const m=Math.round(d/30);
+  return m<=1 ? "graded a month ago" : "graded "+m+" months ago";
+}
+function gradeItemRow(it){
+  const num=n=>String(+(+n).toFixed(2));
+  const val=(it.raw!=null && it.max) ? num(it.raw)+" / "+num(it.max) : (it.grade||"—");
+  const pct=it.pct ? " · "+String(it.pct).replace(/\s*%/,"%") : "";
+  const when=agoLabel(it.when);
+  return `<div class="it"><span class="n">${esc(prettySubject(it.name))}`
+       + (when?`<i>${esc(when)}</i>`:"")
+       + `</span><b class="${gradeClass(it.pct||it.grade)}">${esc(val+pct)}</b></div>`
+       + (it.fb?`<div class="fb">${esc(it.fb)}</div>`:"");
 }
 /* Раскрытие курса: задания тянем по требованию и запоминаем, чтобы не ходить дважды. */
 async function toggleCourse(i){
@@ -1952,8 +2044,7 @@ async function toggleCourse(i){
     const items=await lmsCourseItems(c.id, grades.uid);
     box.dataset.done="1";
     box.innerHTML = items.length
-      ? items.map(it=>`<div class="it"><span>${esc(prettySubject(it.name))}</span>`
-          + `<b class="${gradeClass(it.pct||it.grade)}">${esc(it.grade)}${it.pct?" · "+esc(it.pct):""}</b></div>`).join("")
+      ? items.map(gradeItemRow).join("")
       : `<div class="it"><span>No graded items</span></div>`;
   }catch(e){
     box.innerHTML=`<div class="it"><span>${esc(e.message||"Could not load")}</span></div>`;
@@ -2021,6 +2112,7 @@ $("lgBtn").onclick=async ()=>{
 };
 $("lgPass").onkeydown=e=>{ if(e.key==="Enter") $("lgBtn").click(); };
 $("grSignIn").onclick=()=>{ haptic(); showLogin(); };
+$("grRefresh").onclick=()=>{ haptic(); refreshGrades(false); };
 
 /* ---------- ATTENDANCE: таббар ---------- */
 let attTab = "tasks";   // текущий активный таб
@@ -2042,6 +2134,12 @@ function switchAttTab(tab){
   if(tab === "grades" && lmsToken) renderGrades();
 }
 [...document.querySelectorAll(".att-tab")].forEach(b => b.onclick = () => { haptic(); switchAttTab(b.dataset.tab); });
+/* Фильтр одной кнопкой по кругу: отдельный ряд из трёх кнопок занимал строку
+   экрана ради выбора, который делают редко. */
+$("attFilterBtn").onclick = () => { haptic();
+  attTaskFilter = attTaskFilter==="all" ? "pending" : attTaskFilter==="pending" ? "done" : "all";
+  renderAttTasks();
+};
 
 let attYearFilter = "active";
 let attTaskFilter = "all";
@@ -2066,135 +2164,85 @@ function getActiveYearKey(sections){
 }
 
 function renderAttTasks(){
-  const hasLms = !!lmsToken;
-  if(!hasLms) return;
-  const f = feed;
-  const due = (f && f.due) || [];
-
+  if(!lmsToken) return;
+  const due=(feed && feed.due) || [];
+  const list=$("attDueList");
   if(!due.length){
-    $("attDueList").innerHTML = `<div class="card list" style="margin:0 var(--pad-x);padding:20px;text-align:center;"><span class="muted">${esc(f && f.note ? f.note : "No tasks found")}</span></div>`;
-    $("attTasksBadge").textContent = "";
+    $("attDueCount").textContent="0";
+    $("attDueSub").innerHTML="Tasks<br>"+esc((feed && feed.note) || "nothing found");
+    $("attTasksBadge").textContent="";
+    $("attYears").querySelectorAll(".d").forEach(n=>n.remove());
+    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">`
+      + esc((feed && feed.note) || "No tasks found") + `</span></div></div>`;
     return;
   }
 
-  // 1. Все доступные секции по годам
-  const allSectionsMap = new Map();
-  due.forEach(d => {
-    const sec = courseSection(d.course);
-    if(!allSectionsMap.has(sec.key)) allSectionsMap.set(sec.key, sec);
+  const secMap=new Map();
+  due.forEach(d=>{ const sec=courseSection(d.course); if(!secMap.has(sec.key)) secMap.set(sec.key,sec); });
+  const activeKey=getActiveYearKey([...secMap.values()]);
+  const curKey = attYearFilter==="active" ? activeKey : attYearFilter;
+  buildYearStrip("attYears", [...secMap.values()], curKey, activeKey,
+    k=>{ attYearFilter=k; renderAttTasks(); });
+  requestAnimationFrame(()=>movePillIn("attYears","attYearPill"));
+
+  const inYear = due.map((d,origIdx)=>({ d, origIdx })).filter(x=>{
+    if(curKey==="all") return true;
+    const sec=courseSection(x.d.course);
+    return sec.key===curKey || (!sec.key && curKey===activeKey);
   });
-  const allSections = [...allSectionsMap.values()];
-  const activeKey = getActiveYearKey(allSections);
+  const doneN=inYear.filter(x=>x.d.submitted).length;
+  const pending=inYear.length-doneN;
+  const secNow=secMap.get(curKey);
+  const title = curKey==="all" ? "All years"
+    : (secNow && secNow.year ? ORD[secNow.year]+" year" : "Current");
 
-  let html = "";
+  /* Крупная цифра — то, ради чего экран открывают: сколько ещё не сдано.
+     Фильтр переехал в кнопку справа, как "Today" в расписании: один ряд
+     управления вместо двух. */
+  $("attDueCount").textContent=String(pending);
+  $("attDueSub").innerHTML=esc(title)+"<br>"+pending+" to do "+"\u00b7 "+doneN+" done";
+  $("attTasksBadge").textContent = pending ? String(pending) : (inYear.length ? "\u2713" : "");
+  $("attFilterBtn").textContent = attTaskFilter==="pending" ? "To do"
+    : attTaskFilter==="done" ? "Done" : "All";
 
-  // Переключатель годов (по умолчанию — актуальный год)
-  if(allSections.length > 1 || activeKey){
-    html += `<div class="year-switcher">`;
-    const isActSel = (attYearFilter === "active");
-    const activeSec = allSectionsMap.get(activeKey);
-    const activeLabel = activeSec && activeSec.year ? ORD[activeSec.year] + " year (Current)" : "Current year";
-
-    html += `<button type="button" class="y-btn ${isActSel?'sel':''}" onclick="setYearFilter('active')">★ ${esc(activeLabel)}</button>`;
-    html += `<button type="button" class="y-btn ${attYearFilter==='all'?'sel':''}" onclick="setYearFilter('all')">All years</button>`;
-
-    const sortedSecs = allSections.filter(s=>s.key && s.key!==activeKey).sort((a,b)=>(a.year&&b.year)?a.year-b.year:0);
-    sortedSecs.forEach(sec => {
-      const label = sec.year ? ORD[sec.year] + " year" : (sec.code || "Other");
-      const isSel = (attYearFilter === sec.key);
-      html += `<button type="button" class="y-btn ${isSel?'sel':''}" onclick="setYearFilter('${esc(sec.key)}')">${esc(label)}</button>`;
-    });
-    html += `</div>`;
-  }
-
-  // Фильтрация по году
-  const yearFiltered = due.map((d, origIdx) => ({ d, origIdx })).filter(x => {
-    if(attYearFilter === "active"){
-      const sec = courseSection(x.d.course);
-      return !activeKey || sec.key === activeKey || !sec.key;
-    }
-    if(attYearFilter === "all") return true;
-    const sec = courseSection(x.d.course);
-    return sec.key === attYearFilter;
-  });
-
-  const totalAll = yearFiltered.length;
-  const totalDone = yearFiltered.filter(x => x.d.submitted).length;
-  const totalPending = totalAll - totalDone;
-
-  $("attTasksBadge").textContent = totalPending ? String(totalPending) : (totalAll ? "✓" : "");
-
-  // 2. Фильтры статуса (All / Pending / Done)
-  html += `<div class="task-filters">`
-    + `<button type="button" class="t-flt ${attTaskFilter==='all'?'sel':''}" onclick="setTaskFilter('all')">All (${totalAll})</button>`
-    + `<button type="button" class="t-flt ${attTaskFilter==='pending'?'sel':''}" onclick="setTaskFilter('pending')">Pending (${totalPending})</button>`
-    + `<button type="button" class="t-flt ${attTaskFilter==='done'?'sel':''}" onclick="setTaskFilter('done')">Done (${totalDone})</button>`
-    + `</div>`;
-
-  const finalItems = yearFiltered.filter(x => {
-    if(attTaskFilter === "pending") return !x.d.submitted;
-    if(attTaskFilter === "done") return x.d.submitted;
-    return true;
-  });
-
-  if(!finalItems.length){
-    html += `<div class="card list" style="margin:0 var(--pad-x);padding:20px;text-align:center;"><div class="due-none">No tasks in this filter</div></div>`;
-    $("attDueList").innerHTML = html;
+  const items=inYear.filter(x=>
+    attTaskFilter==="pending" ? !x.d.submitted
+    : attTaskFilter==="done" ? x.d.submitted : true);
+  if(!items.length){
+    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">Nothing in this filter</span></div></div>`;
     return;
   }
 
-  // 3. Группировка по предмету
-  const subjectMap = new Map();
-  finalItems.forEach(item => {
-    const subjName = prettySubject(item.d.course) || "Other Course";
-    if(!subjectMap.has(subjName)) subjectMap.set(subjName, []);
-    subjectMap.get(subjName).push(item);
+  const bySubj=new Map();
+  items.forEach(x=>{
+    const n=prettySubject(x.d.course) || "Other course";
+    if(!bySubj.has(n)) bySubj.set(n,[]);
+    bySubj.get(n).push(x);
   });
 
-  subjectMap.forEach((items, subjName) => {
-    const doneCount = items.filter(x => x.d.submitted).length;
-    const pct = Math.round((doneCount / items.length) * 100);
-    const statusText = (doneCount === items.length) ? '✓ Completed' : `${items.length - doneCount} due`;
-
+  let html="";
+  bySubj.forEach((arr,name)=>{
+    const done=arr.filter(x=>x.d.submitted).length;
+    const pct=Math.round(done/arr.length*100);
     html += `<div class="task-course-card">`
-          + `<div class="task-course-title">`
-          + `  <div>`
-          + `    <span class="n">${esc(subjName)}</span>`
-          + `    <div class="task-progress-bar"><div class="task-progress-fill" style="width:${pct}%"></div></div>`
-          + `  </div>`
-          + `  <span class="task-course-badge">${doneCount}/${items.length} done · ${statusText}</span>`
-          + `</div>`
+          + `<div class="task-course-title"><div><span class="n">${esc(name)}</span>`
+          + `<div class="task-progress-bar"><div class="task-progress-fill" style="width:${pct}%"></div></div></div>`
+          + `<span class="task-course-badge">${done}/${arr.length}</span></div>`
           + `<div class="task-course-items">`;
-
-    items.forEach(x => {
-      const d = x.d;
-      const i = x.origIdx;
-      const L = dueLabel(d.when, d.submitted);
-      const isOk = !!d.submitted;
+    arr.forEach(x=>{
+      const d=x.d, i=x.origIdx, L=dueLabel(d.when, d.submitted), ok=!!d.submitted;
       html += `<div class="due" data-att="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
             + `<span class="mid"><span class="n">${esc(d.name)}</span></span>`
-            + `<span class="st ${isOk ? 'ok' : ''}" data-attst="${i}">${isOk ? CHECK_SVG : DOT_SVG}</span></div>`
+            + `<span class="st ${ok?"ok":""}" data-attst="${i}">${ok?CHECK_SVG:DOT_SVG}</span></div>`
             + `<div class="due-det" data-attdet="${i}"></div>`;
     });
-
     html += `</div></div>`;
   });
-
-  $("attDueList").innerHTML = html;
-  [...$("attDueList").querySelectorAll(".due")].forEach(r => r.onclick = () => toggleAttDue(+r.dataset.att));
+  list.innerHTML=html;
+  [...list.querySelectorAll(".due")].forEach(r=>{ r.onclick=()=>toggleAttDue(+r.dataset.att); });
 }
 
-function setYearFilter(yr){
-  attYearFilter = yr;
-  haptic();
-  renderAttTasks();
-}
 
-function setTaskFilter(flt){
-  attTaskFilter = flt;
-  haptic();
-  renderAttTasks();
-}
 
 function toggleAttDue(i){
   const box = $("attDueList").querySelector(`.due-det[data-attdet="${i}"]`);

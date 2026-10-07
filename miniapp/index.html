@@ -267,12 +267,14 @@
   .list .li.link .v { color: var(--muted); }
 
   /* ================= PROFILE ================= */
-  .logo-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: var(--gap); }
-  .seal { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent-d); flex: none;
-    display: flex; align-items: center; justify-content: center; color: var(--accent-d); }
-  .seal svg { width: 24px; height: 24px; }
-  .logo-t { font-size: 11px; font-weight: 800; letter-spacing: .2px; color: var(--accent-d); line-height: 1.15; }
-  .logo-t small { display: block; font-size: 8.5px; font-weight: 700; color: var(--text2); margin-top: 2px; }
+  .logo-card { display: flex; align-items: center; justify-content: center;
+    padding: 18px 16px; margin-bottom: var(--gap); }
+  /* Ширина вдвое меньше исходной: файл всего 251 px, при большем размере он
+     заметно мылится на плотных экранах. */
+  .brand { display: block; width: 170px; max-width: 100%; height: auto; }
+  .brand.dark { display: none; }
+  :root[data-theme="dark"] .brand.light { display: none; }
+  :root[data-theme="dark"] .brand.dark { display: block; }
   .prof-card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: var(--gap); }
   .prof-card .pava { width: 54px; height: 54px; border-radius: var(--r-md); background: var(--tint); color: var(--accent); }
   .prof-card .nm { flex: 1; font-size: 16px; font-weight: 700; }
@@ -803,9 +805,12 @@
 <!-- ================= PROFILE ================= -->
 <div id="s-profile" class="screen">
   <div class="pad">
+    <!-- Два файла вместо перекраски фильтром: тёмно-синий логотип на чёрном фоне
+         не виден, а filter портит сглаживание на мелком тексте. -->
     <div class="card logo-card">
-      <div class="seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9 12 4 2 9l10 5 10-5z"/><path d="M6 11.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"/></svg></div>
-      <div class="logo-t">TURIN POLYTECHNIC<br>UNIVERSITY IN TASHKENT<small>EST. 2009</small></div>
+      <img class="brand light" src="logo.png" width="251" height="71"
+           alt="Turin Polytechnic University in Tashkent">
+      <img class="brand dark" src="logo-dark.png" width="251" height="71" alt="">
     </div>
     <div class="card prof-card">
       <div class="pava" id="profAva"></div>

@@ -637,7 +637,11 @@
   var RESET_ID="2026-09-15";     // полный сброс: вход, профиль, тема, масштаб
   var CACHE_ID="2026-10-08";     // только кеши LMS, когда у них меняется формат
   try{
-    if(localStorage.getItem("ttpu_reset")!==RESET_ID){
+    /* Метки прошлых сбросов считаем выполненными: у тех, кто успел открыть
+       промежуточную сборку, метка новее нашей, и простое сравнение "не равно"
+       выбросило бы их из аккаунта на ровном месте. */
+    var RESET_DONE = [RESET_ID, "2026-10-05-v5"];
+    if(RESET_DONE.indexOf(localStorage.getItem("ttpu_reset"))<0){
       ["ttpu_profile","ttpu_theme","ttpu_ui","ttpu_data","ttpu_lms_token","ttpu_grades","ttpu_feed"]
         .forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
       localStorage.setItem("ttpu_reset",RESET_ID);
@@ -1684,9 +1688,7 @@ const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const DOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>';
 
 function paintFeed(f){
-  const allDue = f.due || [];
-  const pending = allDue.filter(d => !d.submitted);
-  const due = (pending.length ? pending : allDue).slice(0,6);
+  const due = homeDueList(f);
   $("homeDue").innerHTML = due.length
     ? due.map((d,i)=>{
         const L=dueLabel(d.when, d.submitted);
@@ -1714,10 +1716,7 @@ async function toggleDue(i){
   haptic();
   if(box.classList.contains("on")){ box.classList.remove("on"); return; }
   box.classList.add("on");
-  const allDue = (feed && feed.due) || [];
-  const pending = allDue.filter(d => !d.submitted);
-  const due = (pending.length ? pending : allDue).slice(0,6);
-  const d = due[i]; if(!d) return;
+  const d = homeDueList(feed)[i]; if(!d) return;
   const when = d.when ? new Date(d.when*1000).toLocaleString() : "No deadline set";
   const st = d.submitted ? "Submitted" : (d.subStatus === "draft" ? "Draft — not submitted" : (d.subStatus || "Not submitted"));
   box.innerHTML = `${esc(when)}<br>Status: <b>${esc(st)}</b>`
@@ -2005,6 +2004,25 @@ function movePillIn(stripId, pillId){
   pill.style.transform=`translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
 }
 function moveYearPill(){ movePillIn("grYears","grYearPill"); }
+/* Отбор задач текущего курса. Общий для главной и вкладки задач: считай они
+   по-разному, одно и то же задание показывалось бы в одном месте и пропадало
+   в другом. Если курс определить не удалось, возвращаем список целиком -
+   пустой экран читался бы как "заданий нет", что было бы неправдой. */
+function currentCourseOnly(list, courseOf){
+  const secs=new Map();
+  list.forEach(x=>{ const sec=courseSection(courseOf(x)); if(!secs.has(sec.key)) secs.set(sec.key,sec); });
+  const key=getActiveYearKey([...secs.values()]);
+  const kept=list.filter(x=>{ const sec=courseSection(courseOf(x)); return sec.key===key || !sec.key; });
+  return kept.length ? kept : list;
+}
+/* Список для главной: ближайшие несданные текущего курса. Считается в одном
+   месте, потому что раскрытие строки обращается к нему по номеру - разойдись
+   они, открывалось бы не то задание. */
+function homeDueList(f){
+  const all=currentCourseOnly((f && f.due) || [], d=>d.course);
+  const pending=all.filter(d=>!d.submitted);
+  return (pending.length ? pending : all).slice(0,6);
+}
 /* Строка задания. Балл показываем из максимума: «34 / 50» сразу говорит,
    насколько это много, тогда как одна цифра 34.00 не говорит ничего. Дата
    отвечает на «когда проверили», комментарий преподавателя — на «почему
@@ -2167,17 +2185,7 @@ function renderAttTasks(){
   /* Задачи показываем только за текущий курс: задания прошлых лет давно сданы
      или просрочены, и в списке дел им делать нечего. Выбор года здесь поэтому
      не нужен - в отличие от оценок, куда заглядывают за прошлые семестры. */
-  const secMap=new Map();
-  due.forEach(d=>{ const sec=courseSection(d.course); if(!secMap.has(sec.key)) secMap.set(sec.key,sec); });
-  const activeKey=getActiveYearKey([...secMap.values()]);
-  const all = due.map((d,origIdx)=>({ d, origIdx }));
-  let inYear = all.filter(x=>{
-    const sec=courseSection(x.d.course);
-    return sec.key===activeKey || !sec.key;
-  });
-  /* Если текущий курс не определился - показываем всё, а не пустой экран:
-     пустой список выглядел бы как "заданий нет", что было бы неправдой. */
-  if(!inYear.length) inYear = all;
+  const inYear = currentCourseOnly(due.map((d,origIdx)=>({ d, origIdx })), x=>x.d.course);
   const pending=inYear.filter(x=>!x.d.submitted).length;
   $("attTasksBadge").textContent = pending ? String(pending) : (inYear.length ? "\u2713" : "");
 

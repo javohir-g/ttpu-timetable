@@ -387,7 +387,12 @@
   .gr-status { font-size: 11.5px; color: var(--muted); text-align: center; margin: -2px 0 8px; min-height: 14px; }
   /* Блоки идут друг под другом с просветом: курс от курса отделяется самой
      карточкой, а не только заголовком внутри общего списка. */
-  #grList .card + .card, #attDueList .card + .card { margin-top: var(--gap); }
+  #grList .card + .card { margin-top: var(--gap); }
+  /* Блоки задач - те же карточки с заголовком, что "Due soon" на главной.
+     Шеврона нет: заголовок никуда не ведёт, вместо него счётчик сданных. */
+  #attDueList .sec-h { cursor: default; }
+  #attDueList .sec-h .cnt { flex: none; font-size: 11.5px; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
   #grList, #attDueList { margin-bottom: var(--gap); }
   .gr-row { cursor: pointer; }
   .gr-row .k { color: var(--text); padding-right: 10px; }
@@ -2178,7 +2183,7 @@ function renderAttTasks(){
   const list=$("attDueList");
   if(!due.length){
     $("attTasksBadge").textContent="";
-    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">`
+    list.innerHTML=`<div class="card sec"><div class="sec-b"><span class="muted">`
       + esc((feed && feed.note) || "No tasks found") + `</span></div></div>`;
     return;
   }
@@ -2192,7 +2197,7 @@ function renderAttTasks(){
 
   const items=inYear;
   if(!items.length){
-    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">Nothing in this filter</span></div></div>`;
+    list.innerHTML=`<div class="card sec"><div class="sec-b"><span class="muted">Nothing to do here</span></div></div>`;
     return;
   }
 
@@ -2206,21 +2211,25 @@ function renderAttTasks(){
   /* Одна карточка с разделами по предметам - ровно как список оценок. Раньше
      каждый предмет был отдельной карточкой со своим радиусом, рамкой и тенью,
      каких больше нигде в приложении нет. */
+  /* Блок предмета - карточка с заголовком, как "Due soon" на главной: экран
+     читается как продолжение главной, а не как отдельно придуманный список.
+     Пустого кружка у несданных больше нет - он занимал место и ничего не
+     значил; галочка остаётся там, где есть что отметить. */
   let html="";
   bySubj.forEach((arr,name)=>{
     const done=arr.filter(x=>x.d.submitted).length;
     // несданное выше сданного, внутри - по сроку: сверху то, чем заняться
     arr.sort((x,z)=>(x.d.submitted?1:0)-(z.d.submitted?1:0) || (x.d.when||1e12)-(z.d.when||1e12));
-    html += `<div class="card list"><div class="sec-hd"><span class="t">${esc(name)}</span>`
-          + `<span class="c">${done}/${arr.length}</span></div>`;
+    html += `<div class="card sec"><div class="sec-h"><h2>${esc(name)}</h2>`
+          + `<span class="cnt">${done}/${arr.length}</span></div><div class="sec-b">`;
     arr.forEach(x=>{
       const d=x.d, i=x.origIdx, L=dueLabel(d.when, d.submitted), ok=!!d.submitted;
       html += `<div class="due" data-att="${i}"><span class="lft ${L.c}">${esc(L.t)}</span>`
             + `<span class="mid"><span class="n">${esc(d.name)}</span></span>`
-            + `<span class="st ${ok?"ok":""}" data-attst="${i}">${ok?CHECK_SVG:DOT_SVG}</span></div>`
-            + `<div class="due-det" data-attdet="${i}"></div>`;
+            + (ok ? `<span class="st ok">${CHECK_SVG}</span>` : "")
+            + `</div><div class="due-det" data-attdet="${i}"></div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   });
   list.innerHTML=html;
   [...list.querySelectorAll(".due")].forEach(r=>{ r.onclick=()=>toggleAttDue(+r.dataset.att); });

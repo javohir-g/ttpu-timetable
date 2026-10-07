@@ -385,7 +385,10 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none; }
   .gr-out svg { width: 18px; height: 18px; }
   .gr-status { font-size: 11.5px; color: var(--muted); text-align: center; margin: -2px 0 8px; min-height: 14px; }
-  #grList { margin-bottom: var(--gap); }
+  /* Блоки идут друг под другом с просветом: курс от курса отделяется самой
+     карточкой, а не только заголовком внутри общего списка. */
+  #grList .card + .card, #attDueList .card + .card { margin-top: var(--gap); }
+  #grList, #attDueList { margin-bottom: var(--gap); }
   .gr-row { cursor: pointer; }
   .gr-row .k { color: var(--text); padding-right: 10px; }
   .gr-row .v { color: var(--accent); font-weight: 700; flex: none; }
@@ -784,7 +787,7 @@
         <!-- полоса курсов: та же скользящая плашка, что у дней недели -->
         <div class="card week gr-years" id="grYears"><span class="wk-pill" id="grYearPill"></span></div>
         <div class="gr-status" id="grStatus"></div>
-        <div class="card list" id="grList"></div>
+        <div id="grList"></div>
       </div>
     </div>
     </div>
@@ -1907,7 +1910,7 @@ function paintGrades(g){
   const list=$("grList"), strip=$("grYears");
   strip.querySelectorAll(".d").forEach(n=>n.remove());
   if(!allRows.length){
-    list.innerHTML=`<div class="li"><span class="muted">No courses</span></div>`;
+    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">No courses</span></div></div>`;
     return;
   }
 
@@ -1930,7 +1933,7 @@ function paintGrades(g){
   setGrStatus(ageD >= 1 ? "Updated "+new Date(g.updated).toLocaleDateString() : "");
 
   if(!rows.length){
-    list.innerHTML=`<div class="li"><span class="muted">No courses for this year</span></div>`;
+    list.innerHTML=`<div class="card list"><div class="li"><span class="muted">No courses for this year</span></div></div>`;
     return;
   }
 
@@ -1961,12 +1964,12 @@ function paintGrades(g){
       const l=byKey.get(k), s=l[0].s;
       const codes=[...new Set(l.map(r=>r.s.code).filter(Boolean))].join(", ");
       const t = s.year ? ORD[s.year]+" year" : (s.code || "Other");
-      html += `<div class="sec-hd"><span class="t">${esc(t)}</span>`
-            + (s.year && codes ? `<span class="c">${esc(codes)}</span>` : "") + `</div>`;
-      html += l.map(row).join("");
+      html += `<div class="card list"><div class="sec-hd"><span class="t">${esc(t)}</span>`
+            + (s.year && codes ? `<span class="c">${esc(codes)}</span>` : "") + `</div>`
+            + l.map(row).join("") + `</div>`;
     });
   } else {
-    html = rows.map(row).join("");
+    html = `<div class="card list">` + rows.map(row).join("") + `</div>`;
   }
   list.innerHTML=html;
   [...list.querySelectorAll(".gr-row")].forEach(r=>{ r.onclick=()=>toggleCourse(+r.dataset.i); });
@@ -2203,12 +2206,12 @@ function renderAttTasks(){
   /* Одна карточка с разделами по предметам - ровно как список оценок. Раньше
      каждый предмет был отдельной карточкой со своим радиусом, рамкой и тенью,
      каких больше нигде в приложении нет. */
-  let html='<div class="card list">';
+  let html="";
   bySubj.forEach((arr,name)=>{
     const done=arr.filter(x=>x.d.submitted).length;
     // несданное выше сданного, внутри - по сроку: сверху то, чем заняться
     arr.sort((x,z)=>(x.d.submitted?1:0)-(z.d.submitted?1:0) || (x.d.when||1e12)-(z.d.when||1e12));
-    html += `<div class="sec-hd"><span class="t">${esc(name)}</span>`
+    html += `<div class="card list"><div class="sec-hd"><span class="t">${esc(name)}</span>`
           + `<span class="c">${done}/${arr.length}</span></div>`;
     arr.forEach(x=>{
       const d=x.d, i=x.origIdx, L=dueLabel(d.when, d.submitted), ok=!!d.submitted;
@@ -2217,8 +2220,8 @@ function renderAttTasks(){
             + `<span class="st ${ok?"ok":""}" data-attst="${i}">${ok?CHECK_SVG:DOT_SVG}</span></div>`
             + `<div class="due-det" data-attdet="${i}"></div>`;
     });
+    html += `</div>`;
   });
-  html += '</div>';
   list.innerHTML=html;
   [...list.querySelectorAll(".due")].forEach(r=>{ r.onclick=()=>toggleAttDue(+r.dataset.att); });
 }

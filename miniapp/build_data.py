@@ -36,9 +36,10 @@ OUT = Path(__file__).parent / "data.json"
 LESSON_TYPES = {"lec": "lec", "mar": "lec", "prac": "prac", "sem": "sem", "lab": "lab"}
 
 
-def api_post(url, payload, attempts=3):
-    """Запрос к EduPage. Пара повторов — страховка от разовых сетевых сбоев:
-    молча опубликованное старое расписание дороже лишней минуты ожидания."""
+def api_post(url, payload, attempts=5):
+    """Запрос к EduPage. Повторы — страховка от сетевых сбоев: с серверов GitHub
+    соединение с edupage то проходит, то отваливается по таймауту, а молча
+    опубликованное старое расписание дороже нескольких минут ожидания."""
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
@@ -46,13 +47,14 @@ def api_post(url, payload, attempts=3):
     )
     for n in range(1, attempts + 1):
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=45) as resp:
                 return json.load(resp)
         except urllib.error.URLError as e:
             if n == attempts:
                 raise
-            print(f"попытка {n} не удалась ({e}), повтор через {5 * n} с", file=sys.stderr)
-            time.sleep(5 * n)
+            pause = 10 * n
+            print(f"попытка {n} не удалась ({e}), повтор через {pause} с", file=sys.stderr)
+            time.sleep(pause)
 
 
 def list_timetables():

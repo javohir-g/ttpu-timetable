@@ -82,11 +82,21 @@ jobs:
       - id: deploy
         uses: actions/deploy-pages@v4
 
-      # Последним шагом, уже после публикации: сайт обновлён, но если расписание
-      # собрать не удалось — сборка должна гореть красным и прислать письмо.
-      - name: Сообщить, если расписание не обновилось
-        if: steps.refresh.outcome != 'success'
+      # Последним шагом, уже после публикации. Красным горим не на каждой
+      # неудаче, а когда данные реально протухли: с серверов GitHub соединение
+      # с edupage иногда отваливается по таймауту, и письмо на каждый такой
+      # случай быстро приучило бы не обращать внимания на красный значок —
+      # ровно та болезнь, от которой мы лечим.
+      - name: Сообщить, если расписание давно не обновлялось
+        if: always()
         run: |
-          echo "Расписание не обновилось — опубликованы старые данные."
-          cat refresh.log || true
-          exit 1
+          python -c "
+          import json, datetime, sys
+          d = json.load(open('miniapp/data.json', encoding='utf-8'))
+          t = datetime.datetime.strptime(d['updated'], '%Y-%m-%d %H:%M UTC').replace(tzinfo=datetime.timezone.utc)
+          age = (datetime.datetime.now(datetime.timezone.utc) - t).total_seconds() / 3600
+          print('возраст опубликованных данных: %.1f ч' % age)
+          if age > 24:
+              print('::error::Расписание не обновлялось больше суток - сборщик не достучался до edupage')
+          sys.exit(1 if age > 24 else 0)
+          "

@@ -11,7 +11,10 @@ EduPage хранит расписание версиями, у каждой св
 """
 import json
 import re
+import socket
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -19,20 +22,37 @@ from pathlib import Path
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# EduPage отвечает и по IPv6, но раннеры GitHub живут без IPv6-маршрута, и
+# Python предпочитает именно его. С середины сентября сборка падала там с
+# "Network is unreachable", пока локально всё работало, и три недели публиковала
+# старое расписание. Резолвим только IPv4 — на доступность сайта это не влияет.
+_getaddrinfo = socket.getaddrinfo
+socket.getaddrinfo = lambda host, port, family=0, *a, **kw: _getaddrinfo(
+    host, port, socket.AF_INET, *a, **kw)
+
 SUBDOMAIN = "ttpu"
 OUT = Path(__file__).parent / "data.json"
 
 LESSON_TYPES = {"lec": "lec", "mar": "lec", "prac": "prac", "sem": "sem", "lab": "lab"}
 
 
-def api_post(url, payload):
+def api_post(url, payload, attempts=3):
+    """Запрос к EduPage. Пара повторов — страховка от разовых сетевых сбоев:
+    молча опубликованное старое расписание дороже лишней минуты ожидания."""
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.load(resp)
+    for n in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.load(resp)
+        except urllib.error.URLError as e:
+            if n == attempts:
+                raise
+            print(f"попытка {n} не удалась ({e}), повтор через {5 * n} с", file=sys.stderr)
+            time.sleep(5 * n)
 
 
 def list_timetables():

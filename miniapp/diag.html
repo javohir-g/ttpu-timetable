@@ -151,6 +151,16 @@ function row(title){
   };
 }
 
+/* Поле handlers приходит строкой JSON, а не объектом: без разбора считались
+   символы строки, и в отчёт попадало число вроде 239 вместо трёх. */
+function handlerCount(p){
+  try{
+    const h = typeof p.handlers === "string" ? JSON.parse(p.handlers) : (p.handlers || {});
+    const names = Object.keys(h);
+    return names.length + " (" + names.join(", ") + ")";
+  }catch(e){ return "не разобрать"; }
+}
+
 const NEEDED = [
   ["tool_mobile_get_content", "главный путь: через него работают и отметка, и форма преподавателя"],
   ["tool_mobile_get_autologin_key", "нужен для вращающегося QR: открыть страницу Moodle уже залогиненным"],
@@ -185,7 +195,7 @@ async function runAll(){
     const pl = await call("tool_mobile_get_plugins_supporting_mobile");
     const a = (pl.plugins || []).filter(p => (p.component || "").indexOf("attendance") >= 0);
     r.done(a.length ? "ok" : "bad",
-      a.length ? a.map(p => p.component + " · версия " + p.version + " · обработчиков: " + (p.handlers ? p.handlers.length : 0)).join("\n")
+      a.length ? a.map(p => p.component + " · версия " + p.version + " · обработчиков: " + handlerCount(p)).join("\n")
                : "среди " + ((pl.plugins || []).length) + " плагинов посещаемости нет",
       a.length ? a : pl);
   }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
@@ -194,7 +204,7 @@ async function runAll(){
   try{
     const courses = await call("core_enrol_get_users_courses", { userid: info.userid });
     let scanned = 0;
-    for (const c of courses.slice(0, 20)){
+    for (const c of courses.slice(0, 40)){
       try{
         const cont = await call("core_course_get_contents", { courseid: c.id });
         scanned++;
@@ -220,14 +230,22 @@ async function runAll(){
                 { name: "courseid", value: m.courseid } ]
       });
       const html = (c.templates || []).map(t => t.html || "").join("\n");
+      const text = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
       const teacher = /takeattendance|selectall|take attendance/i.test(html);
-      const student = /submitattendance|studentpass|submit attendance/i.test(html);
-      const sess = (html.match(/sessid/g) || []).length;
+      const student = /submitattendance|studentpass|submit attendance|self.?mark/i.test(html);
+      const empty   = /no sessions|nothing to display|no attendance/i.test(text);
+      const ids = [...new Set(html.match(/sessid[^0-9]{0,4}\d+/g) || [])];
+      // otherdata - именно там плагин передаёт приложению свои данные о занятиях
+      const od = c.otherdata || {};
+      const odKeys = Array.isArray(od) ? od.map(x => x.name) : Object.keys(od);
       r.done("ok",
-        "ответ получен, шаблонов: " + (c.templates || []).length
-        + "\nпохоже на форму преподавателя: " + (teacher ? "да" : "нет")
-        + "\nпохоже на форму студента: " + (student ? "да" : "нет")
-        + "\nупоминаний занятия (sessid): " + sess, c);
+        "шаблонов: " + (c.templates || []).length + ", длина разметки: " + html.length
+        + "\nформа преподавателя: " + (teacher ? "да" : "нет")
+        + " · форма студента: " + (student ? "да" : "нет")
+        + " · «занятий нет»: " + (empty ? "да" : "нет")
+        + "\nссылки на занятия: " + (ids.length ? ids.join(", ") : "нет")
+        + "\nполя otherdata: " + (odKeys.length ? odKeys.join(", ") : "нет")
+        + "\n--- что видно на экране ---\n" + (text.slice(0, 600) || "(пусто)"), c);
     }catch(e){ r.done("bad", "не удалось: " + (e.code || "") + " " + e.message); }
   }
   finish();
@@ -235,7 +253,7 @@ async function runAll(){
 
 function finish(){
   $("repCard").style.display = "";
-  $("rep").value = "Проверка Moodle (посещаемость), " + new Date().toLocaleString() + "\n"
+  $("rep").value = "Проверка Moodle (посещаемость), отчёт v2, " + new Date().toLocaleString() + "\n"
     + "====================================================\n" + report.join("\n\n");
 }
 

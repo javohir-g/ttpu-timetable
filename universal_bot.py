@@ -438,9 +438,11 @@ class TelegramBot:
         if len(text) > 4000:
             text = text[:3990] + "\n…"
         payload = {"chat_id": chat_id, "message_id": message_id,
-                   "text": text, "parse_mode": "HTML"}
-        if keyboard:
-            payload["reply_markup"] = {"inline_keyboard": keyboard}
+                   "text": text, "parse_mode": "HTML",
+                   # всегда указываем клавиатуру явно, даже пустую - иначе
+                   # Telegram оставляет старую (кнопки от прошлого экрана
+                   # остаются висеть под новым текстом и путают)
+                   "reply_markup": {"inline_keyboard": keyboard or []}}
         try:
             api_post(f"{self.base}/editMessageText", payload, timeout=70)
             return True

@@ -32,8 +32,6 @@ BASE_DIR = Path(__file__).parent
 TZ = timezone(timedelta(hours=5))
 # За сколько минут предупреждать. 0 - напоминания выключены.
 REMIND_CHOICES = [5, 10, 15, 30, 60]
-# Метка разового оповещения: сменится - значит, будет новое объявление.
-ANNOUNCE_ID = "reminders-2026-10"
 CONFIG_PATH = BASE_DIR / "config.json"
 # На хостинге файловая система контейнера очищается при каждом развёртывании,
 # поэтому пользователей держим на подключённом томе: DATA_DIR указывает на него.
@@ -632,25 +630,6 @@ class ScheduleBot:
             save_users(self.users)
         return sent
 
-    def announce_reminders(self):
-        """Разовое оповещение о новой функции - по одному на пользователя."""
-        changed = 0
-        for chat_id, profile in list(self.users.items()):
-            if profile.get("announced") == ANNOUNCE_ID:
-                continue
-            self.tg.send(chat_id,
-                         "🔔 <b>Lesson reminders are here</b>\n\n"
-                         "The bot can now message you before a class starts — "
-                         "5, 10, 15, 30 or 60 minutes ahead.\n\n"
-                         "Tap /remind to choose the timing. "
-                         "Reminders are off until you pick one.")
-            profile["announced"] = ANNOUNCE_ID
-            changed += 1
-        if changed:
-            save_users(self.users)
-            print(f"[bot] оповещение о напоминаниях отправлено: {changed}")
-        return changed
-
     # --- обработка ---
 
     def handle_message(self, msg):
@@ -836,16 +815,11 @@ class ScheduleBot:
 
     def run(self):
         print("[bot] запущен, жду сообщений... (Ctrl+C для остановки)")
-        self.announce_reminders()
         while True:
             try:
                 # Проверка времени стоит в том же цикле: get_updates возвращается
                 # не реже чем раз в 50 секунд, отдельный поток ради этого не нужен.
                 self.tick_reminders()
-                # И здесь же - оповещение: на новом хостинге список пользователей
-                # пуст, они приходят уже после старта, и разовая рассылка при
-                # запуске не дошла бы ни до кого.
-                self.announce_reminders()
                 refresh_miniapp_data()
                 for update in self.tg.get_updates():
                     try:

@@ -414,6 +414,15 @@
   .gr-years .d { width: auto; min-width: 54px; height: 38px; padding: 0 12px; }
   .gr-years .d .dn { font-size: 14px; }
   .gr-years .d.today:not(.sel) .dn { color: var(--accent); }
+  /* подпись под строкой посещаемости: сколько баллов из скольких */
+  /* процент посещаемости красим так же, как оценку: низкий виден сразу */
+  #grList .att-row .v { padding: 2px 9px; border-radius: 100px; font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+  #grList .att-row .v.g-hi  { color: var(--ok);     background: rgba(52,199,89,.14); }
+  #grList .att-row .v.g-ok  { color: var(--accent); background: var(--tint); }
+  #grList .att-row .v.g-mid { color: var(--warn);   background: rgba(255,149,0,.16); }
+  #grList .att-row .v.g-low { color: var(--bad);    background: rgba(255,59,48,.14); }
+  .att-sub { font-size: 11px; color: var(--muted); margin: -6px 0 6px; }
   /* курс, у которого оценка изменилась с прошлого обновления */
   .gr-row.fresh .k::after { content: "new"; margin-left: 7px; font-size: 10px; font-weight: 700;
     color: var(--accent); background: var(--tint); padding: 1px 6px; border-radius: 100px;
@@ -1525,6 +1534,75 @@ async function lmsLoadGrades(){
 }
 /* mod и when нужны ленте «последние результаты»: по ним отбираем оценённое
    и сортируем по дате проверки. Экрану оценок лишние поля не мешают. */
+/* ---------- Посещаемость ----------
+   Собственные функции плагина в мобильный сервис не входят, поэтому читаем то
+   же, что видит приложение Moodle: сводку из tool_mobile_get_content. Ответ -
+   шаблон приложения, а не данные, поэтому числа достаём разбором по ключам
+   перевода. Не разобралось - блока просто не будет: лучше промолчать, чем
+   показать неизвестно что. */
+const ATT_KEY = "ttpu_att_mods";
+
+function parseAttendance(html){
+  const text = String(html || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+  const pick = key => {
+    const m = new RegExp("plugin\\.mod_attendance\\." + key + "'\\s*\\|\\s*translate\\s*\\}\\}\\s*([^{]+)").exec(text);
+    return m ? m[1].trim() : "";
+  };
+  const pct = pick("percentagesessionscompleted");
+  if(!pct) return null;
+  return { pct, pts: pick("pointssessionscompleted"), taken: pick("sessionscompleted") };
+}
+
+/* Поиск элементов "Посещаемость" стоит запроса на курс - тридцать с лишним
+   запросов ради списка, который месяцами не меняется. Поэтому результат живёт
+   сутки, а сами сводки тянутся каждый раз: они-то и меняются. */
+async function lmsAttendance(courses, fns){
+  if(!fns.has("tool_mobile_get_content") || !fns.has("core_course_get_contents")) return [];
+  let mods = null;
+  try{
+    const c = JSON.parse(localStorage.getItem(ATT_KEY) || "null");
+    if(c && Date.now() - c.at < 86400000) mods = c.mods;
+  }catch(e){}
+
+  if(!mods){
+    mods = [];
+    let next = 0;
+    const find = async () => {
+      while(next < courses.length){
+        const c = courses[next++];
+        try{
+          const cont = await lmsCall("core_course_get_contents", { courseid: c.id });
+          (cont || []).forEach(sec => (sec.modules || []).forEach(m => {
+            if(m.modname === "attendance") mods.push({ cmid: m.id, courseid: c.id });
+          }));
+        }catch(e){}
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(5, courses.length) }, find));
+    try{ localStorage.setItem(ATT_KEY, JSON.stringify({ at: Date.now(), mods })); }catch(e){}
+  }
+
+  const out = [];
+  let i = 0;
+  const load = async () => {
+    while(i < mods.length){
+      const m = mods[i++];
+      try{
+        const c = await lmsCall("tool_mobile_get_content", {
+          component: "mod_attendance", method: "mobile_view_activity",
+          args: [ { name: "appversioncode", value: 44000 },
+                  { name: "cmid", value: m.cmid },
+                  { name: "courseid", value: m.courseid } ]
+        });
+        const parsed = parseAttendance((c.templates || []).map(t => t.html || "").join(" "));
+        if(parsed) out.push(Object.assign({ courseid: m.courseid }, parsed));
+      }catch(e){}
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, mods.length) }, load));
+  return out;
+}
+
 async function lmsCourseItems(courseid,uid){
   const r=await lmsCall("gradereport_user_get_grade_items",{courseid,userid:uid});
   const ug=(r.usergrades||[])[0];
@@ -1888,7 +1966,14 @@ async function refreshGrades(quiet){
        На первом заходе не помечаем ничего: иначе «новым» оказался бы весь список. */
     const prev=new Map((((grades&&grades.courses)||[])).map(c=>[c.id,c.grade]));
     g.changed = prev.size ? g.courses.filter(c=>c.grade!=null && prev.has(c.id) && prev.get(c.id)!==c.grade).map(c=>c.id) : [];
-    lmsSaveGrades(g); paintGrades(g);   // статус выставит сама paintGrades
+    lmsSaveGrades(g); paintGrades(g);
+    /* Посещаемость тянем после отрисовки: оценки не должны ждать её запросов. */
+    try{
+      const info2 = await lmsCall("core_webservice_get_site_info");
+      const fns2 = new Set((info2.functions || []).map(f => f.name));
+      g.attendance = await lmsAttendance(g.courses, fns2);
+      if(g.attendance.length){ lmsSaveGrades(g); paintGrades(g); }
+    }catch(e){}   // статус выставит сама paintGrades
   }catch(e){
     if(e.code==="invalidtoken" || e.code==="accessexception"){
       // токен отозван или протух — возвращаем на вход, старые оценки не показываем
@@ -1977,7 +2062,22 @@ function paintGrades(g){
          + `<div class="gr-items" data-items="${r.i}"></div>`;
   };
 
+  /* Посещаемость - отдельным блоком сверху: это не оценка за предмет, и
+     мешать их в одном списке значило бы путать две разные вещи. */
   let html="";
+  const att = (g.attendance || []).filter(a => rows.some(r => r.c.id === a.courseid));
+  if(att.length){
+    html += `<div class="card list"><div class="sec-hd"><span class="t">Attendance</span></div>`
+      + att.map(a => {
+          const c = (g.courses || []).find(x => x.id === a.courseid);
+          const name = c ? prettySubject(c.name) : ("Course " + a.courseid);
+          return `<div class="li att-row"><span class="k">${esc(name)}</span>`
+               + `<span class="v ${gradeClass(a.pct)}">${esc(a.pct)}</span></div>`
+               + (a.pts ? `<div class="att-sub">${esc(a.pts)} points</div>` : "");
+        }).join("")
+      + `</div>`;
+  }
+
   if(curKey==="all"){
     /* Разделы по курсам: с ними список из трёх десятков предметов читается,
        без них это сплошная лента. При выборе одного курса они не нужны. */

@@ -9,10 +9,12 @@
 Токен бота берётся из config.json (telegram_bot_token).
 Настройки пользователей хранятся в users.json.
 """
+import http.server
 import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -36,6 +38,10 @@ CONFIG_PATH = BASE_DIR / "config.json"
 # На хостинге файловая система контейнера очищается при каждом развёртывании,
 # поэтому пользователей держим на подключённом томе: DATA_DIR указывает на него.
 # Локально переменной нет - файл лежит рядом со скриптом, как раньше.
+MINIAPP_DIR = BASE_DIR / "miniapp"
+# Как часто пересобирать расписание для мини-аппа. Сборки GitHub делали это раз
+# в шесть часов; здесь дешевле и обновление доезжает до телефонов почти сразу.
+DATA_REFRESH_MIN = int(os.environ.get("DATA_REFRESH_MIN") or 30)
 DATA_DIR = Path(os.environ.get("DATA_DIR") or BASE_DIR)
 USERS_PATH = DATA_DIR / "users.json"
 
@@ -327,6 +333,58 @@ def format_week(schedule, title_name, kind):
 
 
 # ---------------------------------------------------------------- Telegram API
+
+_data_refreshed_at = 0.0
+
+
+def refresh_miniapp_data(force=False):
+    """Пересобирает miniapp/data.json тем же сборщиком, что и сборки GitHub.
+
+    Импорт build_data заодно переключает резолвер на IPv4: у edupage есть адрес
+    IPv6, и на серверах без маршрута к нему запрос падает. Для телеграма и
+    остального это ничего не меняет.
+    """
+    global _data_refreshed_at
+    if not force and time.time() - _data_refreshed_at < DATA_REFRESH_MIN * 60:
+        return False
+    _data_refreshed_at = time.time()
+    try:
+        if str(MINIAPP_DIR) not in sys.path:
+            sys.path.insert(0, str(MINIAPP_DIR))
+        import build_data
+        build_data.main()
+        return True
+    except Exception as e:
+        print(f"[miniapp] расписание не обновилось: {e}")
+        return False
+
+
+class MiniAppHandler(http.server.SimpleHTTPRequestHandler):
+    """Статика мини-аппа. Страницу и данные не кешируем - иначе обновление не
+    доедет до телефона; иконки и анимации меняются редко и живут сутки."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(MINIAPP_DIR), **kwargs)
+
+    def end_headers(self):
+        path = self.path.split("?")[0]
+        longlived = path.startswith("/icons/") or path.endswith((".png", "manifest.json"))
+        self.send_header("Cache-Control",
+                         "public, max-age=86400" if longlived else "no-cache")
+        super().end_headers()
+
+    def log_message(self, *args):
+        pass        # обычные запросы не засоряют журнал развёртывания
+
+
+def serve_miniapp():
+    """Отдаёт мини-апп на порту, который задаёт хостинг."""
+    port = int(os.environ.get("PORT") or 8080)
+    srv = http.server.ThreadingHTTPServer(("", port), MiniAppHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    print(f"[miniapp] раздаётся на порту {port}")
+    return srv
+
 
 class TelegramBot:
     def __init__(self, token):
@@ -749,6 +807,7 @@ class ScheduleBot:
                 # пуст, они приходят уже после старта, и разовая рассылка при
                 # запуске не дошла бы ни до кого.
                 self.announce_reminders()
+                refresh_miniapp_data()
                 for update in self.tg.get_updates():
                     try:
                         if "message" in update:
@@ -788,6 +847,11 @@ def main():
         raise SystemExit("Нет токена бота: задай переменную TELEGRAM_BOT_TOKEN "
                          "или telegram_bot_token в config.json")
     print(f"[bot] данные пользователей: {USERS_PATH}")
+    if os.environ.get("SERVE_MINIAPP", "1") != "0":
+        # сначала данные, потом раздача: свежий контейнер иначе отдал бы
+        # расписание из репозитория, которому может быть несколько дней
+        refresh_miniapp_data(force=True)
+        serve_miniapp()
     ScheduleBot(token, cfg["subdomain"], cfg["miniapp_url"]).run()
 
 

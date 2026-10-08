@@ -422,20 +422,34 @@ class TelegramBot:
                 current = candidate
         if current:
             chunks.append(current)
+        message_id = None
         for i, chunk in enumerate(chunks):
             payload = {"chat_id": chat_id, "text": chunk, "parse_mode": "HTML"}
             if keyboard and i == len(chunks) - 1:
                 payload["reply_markup"] = {"inline_keyboard": keyboard}
-            self.request("sendMessage", payload)
+            resp = self.request("sendMessage", payload)
+            if resp and resp.get("ok"):
+                message_id = resp["result"]["message_id"]
+        return message_id
 
     def edit(self, chat_id, message_id, text, keyboard=None):
+        """True, если сообщение обновлено (или уже было таким же — это не ошибка,
+        чтобы вызывающий код не слал дубликат новым сообщением)."""
         if len(text) > 4000:
             text = text[:3990] + "\n…"
         payload = {"chat_id": chat_id, "message_id": message_id,
                    "text": text, "parse_mode": "HTML"}
         if keyboard:
             payload["reply_markup"] = {"inline_keyboard": keyboard}
-        self.request("editMessageText", payload)
+        try:
+            api_post(f"{self.base}/editMessageText", payload, timeout=70)
+            return True
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            if "message is not modified" in body:
+                return True
+            print(f"[telegram] editMessageText HTTP {e.code}: {body[:200]}")
+            return False
 
     def typing(self, chat_id):
         self.request("sendChatAction", {"chat_id": chat_id, "action": "typing"})
@@ -470,12 +484,31 @@ class ScheduleBot:
         self.edupage = EdupageData(subdomain)
         self.users = load_users()          # chat_id -> {"kind", "id", "name"}
         self.pending = {}                  # chat_id -> "teacher_search"
+        self.panel_msg = {}                 # chat_id -> id сообщения, которое переиспользуем
         self.miniapp_url = miniapp_url
         if miniapp_url:
             # кнопка меню (рядом с полем ввода) открывает мини-апп
             self.tg.request("setChatMenuButton", {"menu_button": {
                 "type": "web_app", "text": "Timetable",
                 "web_app": {"url": miniapp_url}}})
+
+    # --- вывод ---
+
+    def show(self, chat_id, text, keyboard=None, at=None):
+        """Обновляет одно и то же сообщение вместо того, чтобы слать новое на
+        каждый шаг - иначе переписка быстро зарастает дублями (/today пять раз
+        подряд, пошаговая настройка группы и т.п.).
+
+        at - id сообщения из самого callback'а (нажатой кнопки): надёжнее, чем
+        кэш panel_msg, который переживает перезапуск бота только в его памяти.
+        """
+        msg_id = at or self.panel_msg.get(chat_id)
+        if msg_id and self.tg.edit(chat_id, msg_id, text, keyboard):
+            self.panel_msg[chat_id] = msg_id
+            return
+        new_id = self.tg.send(chat_id, text, keyboard)
+        if new_id:
+            self.panel_msg[chat_id] = new_id
 
     # --- клавиатуры ---
 
@@ -526,14 +559,14 @@ class ScheduleBot:
     def send_remind_menu(self, chat_id):
         profile = self.users.get(chat_id)
         if not profile:
-            self.tg.send(chat_id, "Set up first: /start")
+            self.show(chat_id, "Set up first: /start")
             return
         cur = int(profile.get("remind") or 0)
         state = f"now: <b>{cur} min</b> before" if cur else "now: <b>off</b>"
-        self.tg.send(chat_id,
-                     "🔔 <b>Lesson reminders</b>\n\n"
-                     "I can message you before each class — pick how early.\n"
-                     f"{state}", self.kb_remind(cur))
+        self.show(chat_id,
+                  "🔔 <b>Lesson reminders</b>\n\n"
+                  "I can message you before each class — pick how early.\n"
+                  f"{state}", self.kb_remind(cur))
 
     # --- напоминания ---
 
@@ -624,9 +657,9 @@ class ScheduleBot:
 
         if text.startswith("/start"):
             self.pending.pop(chat_id, None)
-            self.tg.send(chat_id,
-                         "👋 Hi! I'm the <b>Turin Polytechnic University</b> timetable bot.\n\n"
-                         "Who are you?", self.kb_role())
+            self.show(chat_id,
+                      "👋 Hi! I'm the <b>Turin Polytechnic University</b> timetable bot.\n\n"
+                      "Who are you?", self.kb_role())
             return
         if text.startswith("/remind"):
             self.send_remind_menu(chat_id)
@@ -636,7 +669,7 @@ class ScheduleBot:
             return
         if text.startswith("/change"):
             self.pending.pop(chat_id, None)
-            self.tg.send(chat_id, "Who are you?", self.kb_role())
+            self.show(chat_id, "Who are you?", self.kb_role())
             return
         if text.startswith(("/today", "/tomorrow", "/week")):
             self.send_schedule(chat_id, text.lstrip("/").split("@")[0].split()[0])
@@ -646,13 +679,13 @@ class ScheduleBot:
         if self.pending.get(chat_id) == "teacher_search":
             matches = self.edupage.search_teachers(text)
             if not matches:
-                self.tg.send(chat_id, "😕 No matches. Try typing the last name differently "
-                                      "(as it appears on edupage):")
+                self.show(chat_id, "😕 No matches. Try typing the last name differently "
+                                   "(as it appears on edupage):")
             elif len(matches) == 1:
                 self.set_profile(chat_id, "teacher", matches[0][0], matches[0][1])
             else:
-                self.tg.send(chat_id, f"Found {len(matches)} matches, pick yourself:",
-                             self.kb_teachers(matches))
+                self.show(chat_id, f"Found {len(matches)} matches, pick yourself:",
+                          self.kb_teachers(matches))
             return
 
         # свободный текст: попробовать как название группы
@@ -660,7 +693,7 @@ class ScheduleBot:
         if found:
             self.set_profile(chat_id, "class", found[0], found[1])
         else:
-            self.tg.send(chat_id, "Sorry, I didn't get that 🤔 Use /start to set up or /help for help.")
+            self.show(chat_id, "Sorry, I didn't get that 🤔 Use /start to set up or /help for help.")
 
     def handle_callback(self, cb):
         chat_id = str(cb["message"]["chat"]["id"])
@@ -673,49 +706,53 @@ class ScheduleBot:
         if data.startswith("rem:"):
             profile = self.users.get(chat_id)
             if not profile:
-                self.tg.send(chat_id, "Set up first: /start")
+                self.show(chat_id, "Set up first: /start", at=message_id)
                 return
             lead = int(data.split(":")[1])
             profile["remind"] = lead
             profile.pop("last_remind", None)      # смена времени начинает с чистого листа
             save_users(self.users)
             state = f"now: <b>{lead} min</b> before" if lead else "now: <b>off</b>"
-            self.tg.edit(chat_id, message_id,
-                         "🔔 <b>Lesson reminders</b>\n\n"
-                         "I can message you before each class — pick how early.\n"
-                         f"{state}", self.kb_remind(lead))
+            self.show(chat_id,
+                      "🔔 <b>Lesson reminders</b>\n\n"
+                      "I can message you before each class — pick how early.\n"
+                      f"{state}", self.kb_remind(lead), at=message_id)
             return
         if data.startswith("sched:"):
             self.edit_schedule(chat_id, message_id, data[6:])
             return
         if data == "role:student":
             self.pending.pop(chat_id, None)
-            self.tg.send(chat_id, "Choose your programme:", self.kb_prefixes())
+            self.show(chat_id, "Choose your programme:", self.kb_prefixes(), at=message_id)
         elif data == "role:teacher":
             self.pending[chat_id] = "teacher_search"
-            self.tg.send(chat_id, "Type your last name (as it appears on edupage):")
+            self.show(chat_id, "Type your last name (as it appears on edupage):", at=message_id)
         elif data.startswith("pfx:"):
             prefix = data[4:]
-            self.tg.send(chat_id, f"<b>{prefix}</b> groups:", self.kb_classes(prefix))
+            self.show(chat_id, f"<b>{prefix}</b> groups:", self.kb_classes(prefix), at=message_id)
         elif data.startswith("cls:"):
             name = data[4:]
             found = self.edupage.find_class(name)
             if found:
-                self.set_profile(chat_id, "class", found[0], found[1])
+                self.set_profile(chat_id, "class", found[0], found[1], at=message_id)
         elif data.startswith("tch:"):
             tid = data[4:]
             name = self.edupage.teacher_name(tid)
             if name:
-                self.set_profile(chat_id, "teacher", tid, name)
+                self.set_profile(chat_id, "teacher", tid, name, at=message_id)
 
-    def set_profile(self, chat_id, kind, entity_id, name):
+    def set_profile(self, chat_id, kind, entity_id, name, at=None):
         self.pending.pop(chat_id, None)
         self.users[chat_id] = {"kind": kind, "id": entity_id, "name": name}
         save_users(self.users)
         kb = None
         if self.miniapp_url:
             kb = [[{"text": "🚀 Open Mini App", "web_app": {"url": self.miniapp_url}}]]
-        self.tg.send(chat_id, f"Done — <b>{name}</b>\n\n" + HELP_TEXT, kb)
+        self.show(chat_id,
+                  f"✅ <b>{name}</b> saved\n\n"
+                  "/today · /tomorrow · /week — timetable\n"
+                  "/remind — class alerts · /change — switch",
+                  kb, at=at)
 
     # --- расписание с навигацией ---
 
@@ -770,28 +807,28 @@ class ScheduleBot:
     def send_schedule(self, chat_id, mode):
         profile = self.users.get(chat_id)
         if not profile:
-            self.tg.send(chat_id, "Set up first: /start")
+            self.show(chat_id, "Set up first: /start")
             return
         self.tg.typing(chat_id)
         try:
             text, kb = self.render_schedule(profile, mode)
         except Exception as e:
             print(f"[edupage] ошибка загрузки: {e}")
-            self.tg.send(chat_id, "⚠️ Failed to load the timetable from edupage, try again later.")
+            self.show(chat_id, "⚠️ Failed to load the timetable from edupage, try again later.")
             return
-        self.tg.send(chat_id, text, kb)
+        self.show(chat_id, text, kb)
 
     def edit_schedule(self, chat_id, message_id, target):
         profile = self.users.get(chat_id)
         if not profile:
-            self.tg.send(chat_id, "Set up first: /start")
+            self.show(chat_id, "Set up first: /start", at=message_id)
             return
         try:
             text, kb = self.render_schedule(profile, target)
         except Exception as e:
             print(f"[edupage] ошибка загрузки: {e}")
             return
-        self.tg.edit(chat_id, message_id, text, kb)
+        self.show(chat_id, text, kb, at=message_id)
 
     # --- главный цикл ---
 

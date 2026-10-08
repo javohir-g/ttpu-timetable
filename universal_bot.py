@@ -10,21 +10,34 @@
 Настройки пользователей хранятся в users.json.
 """
 import json
+import os
 import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 BASE_DIR = Path(__file__).parent
+
+# Ташкент круглый год UTC+5, перевода часов нет - поэтому фиксированный сдвиг,
+# а не часы машины: бот может работать и на чужом сервере в другом поясе.
+TZ = timezone(timedelta(hours=5))
+# За сколько минут предупреждать. 0 - напоминания выключены.
+REMIND_CHOICES = [5, 10, 15, 30, 60]
+# Метка разового оповещения: сменится - значит, будет новое объявление.
+ANNOUNCE_ID = "reminders-2026-10"
 CONFIG_PATH = BASE_DIR / "config.json"
-USERS_PATH = BASE_DIR / "users.json"
+# На хостинге файловая система контейнера очищается при каждом развёртывании,
+# поэтому пользователей держим на подключённом томе: DATA_DIR указывает на него.
+# Локально переменной нет - файл лежит рядом со скриптом, как раньше.
+DATA_DIR = Path(os.environ.get("DATA_DIR") or BASE_DIR)
+USERS_PATH = DATA_DIR / "users.json"
 
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -36,6 +49,7 @@ HELP_TEXT = (
     "/tomorrow — tomorrow's timetable\n"
     "/week — full week\n"
     "/change — change group / teacher\n"
+    "/remind — reminders before classes\n"
     "/help — this help"
 )
 
@@ -385,6 +399,7 @@ def load_users():
 
 
 def save_users(users):
+    USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(USERS_PATH, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
@@ -439,6 +454,110 @@ class ScheduleBot:
         rows.append([{"text": "🔍 Search again", "callback_data": "role:teacher"}])
         return rows
 
+    def kb_remind(self, current):
+        """Выбор времени напоминания; текущее отмечено галочкой."""
+        row = []
+        for m in REMIND_CHOICES:
+            mark = "✅ " if current == m else ""
+            row.append({"text": f"{mark}{m} min", "callback_data": f"rem:{m}"})
+        rows = [row[:3], row[3:]]
+        mark = "✅ " if not current else ""
+        rows.append([{"text": f"{mark}Off", "callback_data": "rem:0"}])
+        return rows
+
+    def send_remind_menu(self, chat_id):
+        profile = self.users.get(chat_id)
+        if not profile:
+            self.tg.send(chat_id, "Set up first: /start")
+            return
+        cur = int(profile.get("remind") or 0)
+        state = f"now: <b>{cur} min</b> before" if cur else "now: <b>off</b>"
+        self.tg.send(chat_id,
+                     "🔔 <b>Lesson reminders</b>\n\n"
+                     "I can message you before each class — pick how early.\n"
+                     f"{state}", self.kb_remind(cur))
+
+    # --- напоминания ---
+
+    def remind_text(self, e, lead, kind):
+        subject, lesson_type = split_subject(e["subject"])
+        head = f"🔔 <b>{subject}</b> starts in {lead} min"
+        line = f"🕐 {e['time']}"
+        if lesson_type:
+            line += f" · {lesson_type[1]}"
+        if e.get("rooms"):
+            line += f" · {e['rooms']}"
+        who = e.get("classes") if kind == "teacher" else e.get("teachers")
+        text = f"{head}\n{line}"
+        if who:
+            text += f"\n👤 {who}"
+        if e.get("groups"):
+            text += f"\n👥 {e['groups']}"
+        return text
+
+    def tick_reminders(self, now=None):
+        """Проверка времени. Вызывается из главного цикла, не реже раза в минуту.
+
+        Пропущенное время не догоняем: если бот лежал, напоминание о паре,
+        которая уже идёт, только путало бы.
+        """
+        now = now or datetime.now(TZ)
+        day_index = now.weekday()
+        if day_index > 5:            # воскресенье
+            return 0
+        now_m = now.hour * 60 + now.minute
+        today_key = now.strftime("%Y-%m-%d")
+        schedules, sent, changed = {}, 0, False
+
+        for chat_id, profile in list(self.users.items()):
+            lead = int(profile.get("remind") or 0)
+            if lead <= 0 or not profile.get("id"):
+                continue
+            key = (profile["kind"], profile["id"])
+            if key not in schedules:
+                try:
+                    schedules[key] = self.edupage.build_schedule(*key)
+                except Exception as err:
+                    print(f"[remind] расписание недоступно: {err}")
+                    schedules[key] = {}
+            for e in schedules[key].get(day_index, []):
+                start = _minutes(e["time"].partition("–")[0])
+                if start is None:
+                    continue
+                # окно в две минуты: цикл просыпается не реже чем раз в 50 секунд,
+                # так что ровно один тик в него попадёт
+                if not (0 <= now_m - (start - lead) <= 1):
+                    continue
+                mark = f"{today_key}:{e['period']}"
+                if profile.get("last_remind") == mark:
+                    continue
+                self.tg.send(chat_id, self.remind_text(e, lead, profile["kind"]))
+                profile["last_remind"] = mark
+                changed = True
+                sent += 1
+        if changed:
+            save_users(self.users)
+        return sent
+
+    def announce_reminders(self):
+        """Разовое оповещение о новой функции - по одному на пользователя."""
+        changed = 0
+        for chat_id, profile in list(self.users.items()):
+            if profile.get("announced") == ANNOUNCE_ID:
+                continue
+            self.tg.send(chat_id,
+                         "🔔 <b>Lesson reminders are here</b>\n\n"
+                         "The bot can now message you before a class starts — "
+                         "5, 10, 15, 30 or 60 minutes ahead.\n\n"
+                         "Tap /remind to choose the timing. "
+                         "Reminders are off until you pick one.")
+            profile["announced"] = ANNOUNCE_ID
+            changed += 1
+        if changed:
+            save_users(self.users)
+            print(f"[bot] оповещение о напоминаниях отправлено: {changed}")
+        return changed
+
     # --- обработка ---
 
     def handle_message(self, msg):
@@ -450,6 +569,9 @@ class ScheduleBot:
             self.tg.send(chat_id,
                          "👋 Hi! I'm the <b>Turin Polytechnic University</b> timetable bot.\n\n"
                          "Who are you?", self.kb_role())
+            return
+        if text.startswith("/remind"):
+            self.send_remind_menu(chat_id)
             return
         if text.startswith("/help"):
             self.tg.send(chat_id, HELP_TEXT)
@@ -489,6 +611,21 @@ class ScheduleBot:
         self.tg.answer_callback(cb["id"])
 
         if data == "noop":
+            return
+        if data.startswith("rem:"):
+            profile = self.users.get(chat_id)
+            if not profile:
+                self.tg.send(chat_id, "Set up first: /start")
+                return
+            lead = int(data.split(":")[1])
+            profile["remind"] = lead
+            profile.pop("last_remind", None)      # смена времени начинает с чистого листа
+            save_users(self.users)
+            state = f"now: <b>{lead} min</b> before" if lead else "now: <b>off</b>"
+            self.tg.edit(chat_id, message_id,
+                         "🔔 <b>Lesson reminders</b>\n\n"
+                         "I can message you before each class — pick how early.\n"
+                         f"{state}", self.kb_remind(lead))
             return
         if data.startswith("sched:"):
             self.edit_schedule(chat_id, message_id, data[6:])
@@ -602,8 +739,12 @@ class ScheduleBot:
 
     def run(self):
         print("[bot] запущен, жду сообщений... (Ctrl+C для остановки)")
+        self.announce_reminders()
         while True:
             try:
+                # Проверка времени стоит в том же цикле: get_updates возвращается
+                # не реже чем раз в 50 секунд, отдельный поток ради этого не нужен.
+                self.tick_reminders()
                 for update in self.tg.get_updates():
                     try:
                         if "message" in update:
@@ -620,14 +761,30 @@ class ScheduleBot:
                 time.sleep(5)
 
 
+def load_config():
+    """Сначала переменные окружения - так настройки задаются на хостинге,
+    и токен не попадает в репозиторий. Потом config.json: он есть только на
+    машине разработчика и в git не отслеживается."""
+    cfg = {}
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg = json.load(f)
+    env = os.environ
+    return {
+        "token": env.get("TELEGRAM_BOT_TOKEN") or cfg.get("telegram_bot_token", ""),
+        "subdomain": env.get("EDUPAGE_SUBDOMAIN") or cfg.get("edupage_subdomain", "ttpu"),
+        "miniapp_url": env.get("MINIAPP_URL") or cfg.get("miniapp_url", ""),
+    }
+
+
 def main():
-    with open(CONFIG_PATH, encoding="utf-8") as f:
-        cfg = json.load(f)
-    token = cfg.get("telegram_bot_token", "")
+    cfg = load_config()
+    token = cfg["token"]
     if not token or "PASTE" in token:
-        raise SystemExit("Заполни telegram_bot_token в config.json (токен от @BotFather)")
-    ScheduleBot(token, cfg.get("edupage_subdomain", "ttpu"),
-                cfg.get("miniapp_url", "")).run()
+        raise SystemExit("Нет токена бота: задай переменную TELEGRAM_BOT_TOKEN "
+                         "или telegram_bot_token в config.json")
+    print(f"[bot] данные пользователей: {USERS_PATH}")
+    ScheduleBot(token, cfg["subdomain"], cfg["miniapp_url"]).run()
 
 
 if __name__ == "__main__":

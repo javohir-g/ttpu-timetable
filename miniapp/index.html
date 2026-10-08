@@ -492,6 +492,18 @@
      один ряд управления вместо двух, и язык тот же, что на остальных страницах. */
   .due-det-inner { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin: 6px 0 8px 0; font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; }
   .due-note { color: var(--text2); background: var(--tint); padding: 6px 10px; border-radius: 6px; margin-top: 4px; font-size: 11.5px; }
+  /* описание задания от преподавателя и список вложений */
+  .task-about { color: var(--text2); font-size: 12px; line-height: 1.45; margin-top: 2px;
+    white-space: pre-line; }
+  .task-files { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+  .task-files .fl { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    background: var(--card); border-radius: 8px; padding: 6px 9px; }
+  .task-files .fl .n { font-size: 11.5px; color: var(--text); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .task-files .fl .s { flex: none; font-size: 10.5px; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
+  .due-det-inner .task-open { width: auto; align-self: flex-start; margin-top: 4px;
+    padding: 7px 12px; font-size: 12.5px; }
   /* display: block обязателен — это span'ы, иначе название и предмет встают в одну строку */
   .due .mid .n { display: block; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .due .mid .c { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1575,7 +1587,12 @@ async function lmsDeadlines(fns){
               course: courseName,
               when: when,
               mod: "assign",
-              inst: a.id
+              inst: a.id,
+              cmid: a.cmid || 0,
+              // описание приходит разметкой; текст режем - в кеше его хранить целиком незачем
+              about: String(a.intro || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ")
+                       .replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 700),
+              files: (a.introattachments || []).map(f => ({ n: f.filename, s: f.filesize || 0 }))
             };
             seenMap.set(key, item);
             events.push(item);
@@ -1732,11 +1749,8 @@ async function toggleDue(i){
   if(box.classList.contains("on")){ box.classList.remove("on"); return; }
   box.classList.add("on");
   const d = homeDueList(feed)[i]; if(!d) return;
-  const when = d.when ? new Date(d.when*1000).toLocaleString() : "No deadline set";
-  const st = d.submitted ? "Submitted" : (d.subStatus === "draft" ? "Draft — not submitted" : (d.subStatus || "Not submitted"));
-  box.innerHTML = `${esc(when)}<br>Status: <b>${esc(st)}</b>`
-    + (d.grade ? `<br>Grade: ${esc(d.grade)}` : "")
-    + (d.note ? `<br>${esc(d.note.slice(0,160))}` : "");
+  box.innerHTML = taskDetailHTML(d);
+  bindTaskOpen(box);
 }
 function renderHomeFeed(){
   const on=!!lmsToken;
@@ -2250,6 +2264,58 @@ function renderAttTasks(){
 
 
 
+function fmtSize(bytes){
+  if(!bytes) return "";
+  if(bytes < 1024) return bytes + " B";
+  if(bytes < 1024*1024) return Math.round(bytes/1024) + " KB";
+  return (bytes/1048576).toFixed(1).replace(/\.0$/, "") + " MB";
+}
+/* Подробности задания - одни и те же на главной и во вкладке задач. */
+function taskDetailHTML(d){
+  const when = d.when ? new Date(d.when*1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+                      : "No deadline set";
+  const stText = d.submitted ? "Submitted" : (d.subStatus === "draft" ? "Draft (not submitted)" : "Not submitted");
+  const stClass = d.submitted ? "g-hi" : "g-low";
+  const files = (d.files || []).map(f =>
+    `<div class="fl"><span class="n">${esc(f.n)}</span><span class="s">${esc(fmtSize(f.s))}</span></div>`).join("");
+  return `<div class="due-det-inner">`
+    + `<div>\u{1F4C5} <b>Due:</b> ${esc(when)}</div>`
+    + `<div>\u{1F4CC} <b>Status:</b> <span class="${stClass}">${esc(stText)}</span></div>`
+    + (d.grade ? `<div>\u{1F4AF} <b>Grade:</b> <b class="${gradeClass(d.grade)}">${esc(d.grade)}</b></div>` : "")
+    + (d.about ? `<div class="task-about">${esc(d.about)}</div>` : "")
+    + (files ? `<div class="task-files">${files}</div>` : "")
+    + (d.note ? `<div class="due-note">\u{1F4AC} ${esc(d.note.slice(0,200))}</div>` : "")
+    + (d.cmid ? `<button class="btn ghost task-open" data-cmid="${d.cmid}">Open in Moodle</button>` : "")
+    + `</div>`;
+}
+/* Открываем задание в Moodle одноразовым ключом входа. Прямые ссылки на файлы
+   Moodle отдаёт только с токеном в адресе, а токен - это ключ от всего личного
+   кабинета: переслал ссылку, отдал доступ. Ключ живёт минуты и срабатывает раз. */
+async function openInMoodle(cmid, btn){
+  const target = LMS + "/mod/assign/view.php?id=" + cmid;
+  const label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Opening\u2026"; }
+  let url = target;
+  try{
+    const uid = (grades && grades.uid) || (await lmsCall("core_webservice_get_site_info")).userid;
+    const k = await lmsCall("tool_mobile_get_autologin_key");
+    if(k && k.autologinurl && k.key){
+      url = k.autologinurl + (k.autologinurl.indexOf("?") >= 0 ? "&" : "?")
+          + "userid=" + encodeURIComponent(uid) + "&key=" + encodeURIComponent(k.key)
+          + "&urltogo=" + encodeURIComponent(target);
+    }
+  }catch(e){
+    // ключ дают не чаще раза в несколько минут - открываем обычной ссылкой:
+    // в браузере пользователь, скорее всего, уже вошёл
+  }
+  try{ if(tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank", "noopener"); }
+  catch(e){ window.open(url, "_blank", "noopener"); }
+  if(btn){ btn.disabled = false; btn.textContent = label; }
+}
+function bindTaskOpen(box){
+  const b = box.querySelector(".task-open");
+  if(b) b.onclick = ev => { ev.stopPropagation(); haptic(); openInMoodle(+b.dataset.cmid, b); };
+}
 function toggleAttDue(i){
   const box = $("attDueList").querySelector(`.due-det[data-attdet="${i}"]`);
   if(!box) return;
@@ -2257,16 +2323,8 @@ function toggleAttDue(i){
   if(box.classList.contains("on")){ box.classList.remove("on"); return; }
   box.classList.add("on");
   const d = (feed && feed.due || [])[i]; if(!d) return;
-  const when = d.when ? new Date(d.when*1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "No deadline set";
-  const stText = d.submitted ? "Submitted ✓" : (d.subStatus === "draft" ? "Draft (not submitted)" : "Not submitted");
-  const stClass = d.submitted ? "g-hi" : "g-low";
-
-  box.innerHTML = `<div class="due-det-inner">`
-    + `<div>📅 <b>Due:</b> ${esc(when)}</div>`
-    + `<div>📌 <b>Status:</b> <span class="${stClass}">${esc(stText)}</span></div>`
-    + (d.grade ? `<div>💯 <b>Grade:</b> <b class="${gradeClass(d.grade)}">${esc(d.grade)}</b></div>` : "")
-    + (d.note  ? `<div class="due-note">💬 ${esc(d.note.slice(0,200))}</div>` : "")
-    + `</div>`;
+  box.innerHTML = taskDetailHTML(d);
+  bindTaskOpen(box);
 }
 
 function renderAtt(){
